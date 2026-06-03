@@ -160,7 +160,8 @@ describe("Postgres Query Builder", () => {
         schema: "public", table: "t", 
         data: { status: "paid" }, 
         where: [{ id:"1", column: "id", operator: "=", value: "123", value2: "", logic: "AND" }],
-        returnData: true 
+        returnData: true,
+        allowFullTableUpdate: false
       })
       expect(sql).toContain(`UPDATE "public"."t" SET "status"=$1 WHERE "id" = $2 RETURNING *`)
       expect(params).toEqual(["paid", "123"])

@@ -341,7 +341,7 @@ export const postgresExecutor: NodeExecutor = async ({
               data: resolvedData,
               where,
               returnData: config.returnData ?? true,
-              allowFullTableUpdate: config.allowFullTableUpdate ?? false,
+              allowFullTableUpdate: (config as any).allowFullTableUpdate ?? false,
             })
 
             const queryResult = await executeQuery(client, built.sql, built.params, 10000)
