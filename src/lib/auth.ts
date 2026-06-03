@@ -1,16 +1,25 @@
 import {betterAuth} from "better-auth"
 import { prismaAdapter } from "better-auth/adapters/prisma"
 import prisma from "./db"
-
-export const auth = betterAuth({
- database: prismaAdapter(prisma,{
-    provider:"postgresql"
- }),
- emailAndPassword:{
-    enabled:true,
-    autoSignIn:true,
-    requireEmailVerification: true
- },
+ import { compare, hash } from "bcryptjs"
+ 
+ export const auth = betterAuth({
+  database: prismaAdapter(prisma,{
+     provider:"postgresql"
+  }),
+  emailAndPassword:{
+     enabled:true,
+     autoSignIn:true,
+     requireEmailVerification: true,
+     password: {
+       hash: async (password) => {
+         return await hash(password, 12);
+       },
+       verify: async ({ hash: hashedPassword, password }) => {
+         return await compare(password, hashedPassword);
+       }
+     }
+  },
  trustedOrigins: [
     "https://nodebase.mayanksaraswal.in",
     "https://www.nodebase.mayanksaraswal.in",
