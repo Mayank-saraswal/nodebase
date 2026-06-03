@@ -39,8 +39,8 @@ const sections: NavSection[] = [
     title: "Triggers",
     items: [
       { title: "Manual Trigger", href: "/docs/nodes#manual-trigger" },
-      { title: "Webhook Trigger", href: "/docs/nodes#webhook-trigger" },
-      { title: "Schedule Trigger", href: "/docs/nodes#schedule-trigger" },
+      { title: "Webhook Trigger", href: "/docs/nodes/webhook-trigger" },
+      { title: "Schedule Trigger", href: "/docs/nodes/schedule-trigger" },
       { title: "Razorpay Trigger", href: "/docs/nodes/razorpay-trigger" },
       { title: "WhatsApp Trigger", href: "/docs/nodes/whatsapp-trigger" },
       { title: "Error Trigger", href: "/docs/nodes/error-trigger" },
@@ -167,7 +167,8 @@ function TableOfContents() {
       document.querySelectorAll<HTMLElement>(
         "#docs-content h2, #docs-content h3",
       ),
-    );
+    ).filter((el) => !!el.id);
+
     setHeadings(
       els.map((el) => ({
         id: el.id,
@@ -198,9 +199,9 @@ function TableOfContents() {
       <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         On this page
       </p>
-      {headings.map((h) => (
+      {headings.map((h, idx) => (
         <a
-          key={h.id}
+          key={`${h.id}-${idx}`}
           href={`#${h.id}`}
           className={cn(
             "block truncate py-1 text-xs transition-colors",
