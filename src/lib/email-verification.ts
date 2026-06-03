@@ -24,7 +24,7 @@ export function getTokenExpiry(): Date {
 
 // Build the verification URL
 export function buildVerifyUrl(token: string): string {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://nodebase.tech"
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://nodebase.mayanksaraswal.in"
   return `${baseUrl}/verify-email?token=${token}`
 }
 
@@ -34,6 +34,17 @@ export async function sendVerificationEmail(
   userName: string,
   token: string
 ): Promise<void> {
+  const verifyUrl = buildVerifyUrl(token)
+
+  // Bypass email sending in development to avoid SMTP/Resend errors
+  if (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test") {
+    console.log("\n==========================================")
+    console.log(`📧 [DEV EMAIL] To: ${toEmail}`)
+    console.log(`🔗 Verification Link: ${verifyUrl}`)
+    console.log("==========================================\n")
+    return
+  }
+
   const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: parseInt(process.env.SMTP_PORT || "587"),
@@ -44,10 +55,8 @@ export async function sendVerificationEmail(
     },
   })
 
-  const verifyUrl = buildVerifyUrl(token)
-
   await transporter.sendMail({
-    from: `"Nodebase" <${process.env.SMTP_FROM || "noreply@nodebase.tech"}>`,
+    from: `"Nodebase" <${process.env.SMTP_FROM || "noreply@nodebase.mayanksaraswal.in"}>`,
     to: toEmail,
     subject: "Verify your Nodebase account",
     html: `
@@ -125,6 +134,16 @@ export async function sendResendVerificationEmail(
   token: string
 ): Promise<void> {
   const verifyUrl = buildVerifyUrl(token)
+
+  // Bypass email sending in development to avoid SMTP/Resend errors
+  if (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test") {
+    console.log("\n==========================================")
+    console.log(`📧 [DEV EMAIL RESEND] To: ${toEmail}`)
+    console.log(`🔗 New Verification Link: ${verifyUrl}`)
+    console.log("==========================================\n")
+    return
+  }
+
   const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: parseInt(process.env.SMTP_PORT || "587"),
@@ -136,7 +155,7 @@ export async function sendResendVerificationEmail(
   })
   
   await transporter.sendMail({
-    from: `"Nodebase" <${process.env.SMTP_FROM || "noreply@nodebase.tech"}>`,
+    from: `"Nodebase" <${process.env.SMTP_FROM || "noreply@nodebase.mayanksaraswal.in"}>`,
     to: toEmail,
     subject: "New verification link for Nodebase",
     html: `

@@ -42,7 +42,7 @@ export async function checkExecutionLimit(userId: string): Promise<void> {
   if (user.workflowRunsUsed >= limits.runs) {
     throw new TRPCError({
       code: "FORBIDDEN",
-      message: `You have used ${user.workflowRunsUsed}/${limits.runs} workflow runs this month on the ${limits.name} plan. Upgrade at https://nodebase.tech/pricing`,
+      message: `You have used ${user.workflowRunsUsed}/${limits.runs} workflow runs this month on the ${limits.name} plan. Upgrade at https://nodebase.mayanksaraswal.in/pricing`,
     })
   }
 }

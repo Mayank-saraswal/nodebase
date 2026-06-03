@@ -5,7 +5,7 @@ export function SoftwareAppStructuredData() {
     "name": "Nodebase",
     "applicationCategory": "BusinessApplication",
     "operatingSystem": "Web",
-    "url": "https://nodebase.tech",
+    "url": "https://nodebase.mayanksaraswal.in",
     "description":
       "Workflow automation platform built for Indian businesses. " +
       "Native integrations with Razorpay, Cashfree, MSG91, Shiprocket, and 100+ services.",
@@ -17,7 +17,7 @@ export function SoftwareAppStructuredData() {
     "creator": {
       "@type": "Organization",
       "name": "Nodebase",
-      "url": "https://nodebase.tech",
+      "url": "https://nodebase.mayanksaraswal.in",
     },
     "featureList": [
       "Visual workflow builder",
@@ -31,7 +31,7 @@ export function SoftwareAppStructuredData() {
       "Schedule-based triggers",
       "Webhook triggers",
     ],
-    "screenshot": "https://nodebase.tech/opengraph-image",
+    "screenshot": "https://nodebase.mayanksaraswal.in/opengraph-image",
     "inLanguage": "en-IN",
     "audience": {
       "@type": "Audience",
@@ -52,8 +52,8 @@ export function OrganizationStructuredData() {
     "@context": "https://schema.org",
     "@type": "Organization",
     "name": "Nodebase",
-    "url": "https://nodebase.tech",
-    "logo": "https://nodebase.tech/logos/nodebase.png",
+    "url": "https://nodebase.mayanksaraswal.in",
+    "logo": "https://nodebase.mayanksaraswal.in/logos/nodebase.png",
     "description": "Workflow automation platform built for Indian businesses.",
     "foundingDate": "2025",
     "address": {

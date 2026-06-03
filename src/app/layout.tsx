@@ -20,7 +20,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://nodebase.tech"),
+  metadataBase: new URL("https://nodebase.mayanksaraswal.in"),
   title: {
     default: "Nodebase — Workflow Automation Built for India",
     template: "%s | Nodebase",
@@ -63,7 +63,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_IN",
-    url: "https://nodebase.tech",
+    url: "https://nodebase.mayanksaraswal.in",
     siteName: "Nodebase",
     title: "Nodebase — Workflow Automation Built for India",
     description:
@@ -88,7 +88,7 @@ export const metadata: Metadata = {
     creator: "@nodebasetech",
   },
   alternates: {
-    canonical: "https://nodebase.tech",
+    canonical: "https://nodebase.mayanksaraswal.in",
   },
   verification: {
     google: process.env.GOOGLE_SITE_VERIFICATION || "",

@@ -52,7 +52,7 @@ export function useRazorpay() {
       subscription_id: subscriptionId,
       name: "Nodebase",
       description: `${plan} Plan — Monthly Subscription`,
-      image: "https://nodebase.tech/logos/nodebase.png",
+      image: "https://nodebase.mayanksaraswal.in/logos/nodebase.png",
 
       // Pre-fill user details to speed up checkout
       prefill: {

@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Redirect back with success indicators
-    const baseUrl = process.env.NEXTAUTH_URL ?? "https://nodebase.tech"
+    const baseUrl = process.env.NEXTAUTH_URL ?? "https://nodebase.mayanksaraswal.in"
     const successUrl = new URL(safeReturnUrl, baseUrl)
     successUrl.searchParams.set("google_success", userInfo.email)
     successUrl.searchParams.set("credential_id", credentialId)
@@ -106,7 +106,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(successUrl)
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : "Unknown error"
-    const baseUrl = process.env.NEXTAUTH_URL ?? "https://nodebase.tech"
+    const baseUrl = process.env.NEXTAUTH_URL ?? "https://nodebase.mayanksaraswal.in"
     // FIX 2 — also validate error redirect URL
     const safeErrorReturn = (stateData?.returnUrl ?? "/credentials/new").startsWith("/")
       ? (stateData?.returnUrl ?? "/credentials/new")

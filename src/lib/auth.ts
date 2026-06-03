@@ -12,9 +12,9 @@ export const auth = betterAuth({
     requireEmailVerification: true
  },
  trustedOrigins: [
-    "https://nodebase.tech",
-    "https://www.nodebase.tech",
-    // DigitalOcean App Platform URLs are handled by nodebase.tech domain
+    "https://nodebase.mayanksaraswal.in",
+    "https://www.nodebase.mayanksaraswal.in",
+    // DigitalOcean App Platform URLs are handled by nodebase.mayanksaraswal.in domain
     "https://vast-lemur-notable.ngrok-free.app",
     "http://localhost:3000"
  ],

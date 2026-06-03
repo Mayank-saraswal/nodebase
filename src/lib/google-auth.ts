@@ -38,7 +38,7 @@ export function getGoogleClientSecret(type?: string): string {
 export function getGoogleRedirectUri(): string {
   return (
     process.env.GOOGLE_REDIRECT_URI ??
-    `${process.env.NEXTAUTH_URL ?? "https://nodebase.tech"}/api/auth/google/callback`
+    `${process.env.NEXTAUTH_URL ?? "https://nodebase.mayanksaraswal.in"}/api/auth/google/callback`
   )
 }
 
