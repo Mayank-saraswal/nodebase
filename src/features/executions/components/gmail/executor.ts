@@ -313,7 +313,7 @@ export const gmailExecutor: NodeExecutor<GmailData> = async ({
             )
           }
 
-          // Large attachment handling: offload to Azure Blob to avoid DB bloat
+          // Large attachment handling: offload to DigitalOcean Spaces to avoid DB bloat
           let finalAttachmentData = attachmentData
           let finalAttachmentName = attachmentName
           let finalBody = body

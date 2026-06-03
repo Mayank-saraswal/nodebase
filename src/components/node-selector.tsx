@@ -272,7 +272,7 @@ const executionNodes: NodeTypeOptions[] = [
     {
         type:NodeType.MEDIA_UPLOAD,
         label:"Media Upload",
-        description:"Upload image/audio/video to Azure and get a permanent URL",
+        description:"Upload image/audio/video to cloud storage and get a permanent URL",
         icon:UploadIcon
     },
     {

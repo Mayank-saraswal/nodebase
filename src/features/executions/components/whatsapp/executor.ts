@@ -184,7 +184,7 @@ export const whatsappExecutor: NodeExecutor<WhatsAppData> = async ({
             "WhatsApp SEND_IMAGE: 'mediaUrl' is required"
           )
 
-        // Auto-upload temp/base64 URLs to Azure Blob — WhatsApp requires a permanent public HTTPS URL
+        // Auto-upload temp/base64 URLs to DigitalOcean Spaces — WhatsApp requires a permanent public HTTPS URL
         let finalMediaUrl = mediaUrl
         const needsUpload =
           mediaUrl.startsWith("data:") ||
@@ -203,7 +203,7 @@ export const whatsappExecutor: NodeExecutor<WhatsAppData> = async ({
             )
             finalMediaUrl = uploadResult.url
           } catch (err) {
-            console.error("WhatsApp: Failed to upload media to Azure Blob:", err)
+            console.error("WhatsApp: Failed to upload media to cloud storage:", err)
             // Fall back to original URL — may still work if not actually expired
           }
         }
@@ -223,7 +223,7 @@ export const whatsappExecutor: NodeExecutor<WhatsAppData> = async ({
             "WhatsApp SEND_DOCUMENT: 'mediaUrl' is required"
           )
 
-        // Auto-upload temp/base64 URLs to Azure Blob — WhatsApp requires a permanent public HTTPS URL
+        // Auto-upload temp/base64 URLs to DigitalOcean Spaces — WhatsApp requires a permanent public HTTPS URL
         let finalDocUrl = mediaUrl
         const docNeedsUpload =
           mediaUrl.startsWith("data:") ||
@@ -242,7 +242,7 @@ export const whatsappExecutor: NodeExecutor<WhatsAppData> = async ({
             )
             finalDocUrl = uploadResult.url
           } catch (err) {
-            console.error("WhatsApp: Failed to upload document to Azure Blob:", err)
+            console.error("WhatsApp: Failed to upload document to cloud storage:", err)
           }
         }
 

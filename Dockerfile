@@ -19,7 +19,7 @@ COPY . .
 RUN npx prisma generate
 
 # Dummy env vars so Next.js can build without real credentials
-# Real values are injected at runtime by Azure Container Apps
+# Real values are injected at runtime by DigitalOcean App Platform
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV DATABASE_URL="postgresql://dummy:dummy@dummy:5432/dummy"
 ENV DIRECT_DATABASE_URL="postgresql://dummy:dummy@dummy:5432/dummy"
