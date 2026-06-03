@@ -1,0 +1,173 @@
+// ─────────────────────────────────────────────────────────────
+// Nodebase — Prisma Schema: Flow Control Node Models
+// IfElseNode, SwitchNode, LoopNode, WaitNode,
+// MergeNode, SetVariableNode, CodeNode
+// ─────────────────────────────────────────────────────────────
+
+model IfElseNode {
+  id         String @id @default(cuid())
+  workflowId String
+  nodeId     String @unique
+
+  // Condition configuration (legacy single-condition fields, kept for backward compatibility)
+  field    String         @default("")
+  operator IfElseOperator @default(EQUALS)
+  value    String         @default("")
+
+  // Compound conditions JSON (AND/OR groups)
+  conditionsJson String @default("") @db.Text
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workflow workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+  @@index([nodeId])
+}
+
+model SwitchNode {
+  id           String   @id @default(cuid())
+  nodeId       String   @unique
+  workflowId   String
+  variableName String   @default("switch")
+  casesJson    String   @default("[]") @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  workflow     workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([nodeId])
+}
+
+model SetVariableNode {
+  id         String   @id @default(cuid())
+  nodeId     String   @unique
+  workflowId String
+  pairs      Json // stores array of {key: string, value: string}
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  workflow workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+  @@index([nodeId])
+}
+
+model CodeNode {
+  id             String   @id @default(cuid())
+  nodeId         String   @unique
+  workflowId     String
+  code           String   @db.Text
+  language       String   @default("javascript")
+  outputMode     String   @default("append")
+  timeout        Int      @default(5000)
+  continueOnFail Boolean  @default(false)
+  allowedDomains String   @default("")
+  variableName   String   @default("codeOutput")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  workflow workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+  @@index([nodeId])
+}
+
+model LoopNode {
+  id            String   @id @default(cuid())
+  nodeId        String   @unique
+  workflowId    String
+  inputPath     String   @default("googleSheets.rows")
+  itemVariable  String   @default("item")
+  maxIterations Int      @default(100)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  workflow workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+  @@index([nodeId])
+}
+
+model WaitNode {
+  id               String   @id @default(cuid())
+  nodeId           String   @unique
+  workflowId       String
+
+  // Resume mode: "duration" | "until" | "webhook"
+  waitMode         String   @default("duration")
+
+  // Duration mode fields
+  duration         Int      @default(30)
+  durationUnit     String   @default("minutes")
+
+  // Until mode fields
+  untilDatetime    String   @default("")
+  timezone         String   @default("UTC")
+
+  // Webhook mode fields
+  timeoutDuration  Int      @default(24)
+  timeoutUnit      String   @default("hours")
+  continueOnTimeout Boolean @default(true)
+
+  // Output
+  variableName     String   @default("wait")
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  workflow workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+  @@index([nodeId])
+}
+
+model MergeNode {
+  id           String @id @default(cuid())
+  nodeId       String @unique
+  workflowId   String
+
+  // How many input branches to wait for (2-10)
+  inputCount   Int    @default(2)
+
+  // Merge strategy:
+  // "position"   — zip by index position
+  // "combine"    — combine all fields from all branches into one object (default)
+  // "crossJoin"  — cartesian product of all items
+  // "keyMatch"   — inner join by a key field
+  // "keyDiff"    — outer difference — items in branch1 NOT in branch2
+  mergeMode    String @default("combine")
+
+  // For keyMatch and keyDiff modes:
+  // The dot-path field to match on e.g. "orderId" or "email"
+  // Supports {{variables}} — resolved at runtime
+  matchKey1    String @default("")
+  matchKey2    String @default("")
+
+  // For position mode:
+  // "shortest" — zip to shortest branch length
+  // "longest"  — pad shorter branches with null
+  positionFill String @default("shortest")
+
+  // Branch variable name selection
+  // branchKey1/branchKey2 — variable names of the first/second branch (e.g. "gmail", "slack")
+  // branchKeys — comma-separated list for 3+ branch modes (e.g. "gmail,slack,notion")
+  branchKey1   String @default("")
+  branchKey2   String @default("")
+  branchKeys   String @default("")
+
+  // Wait for ALL branches to complete before merging
+  waitForAll   Boolean @default(true)
+
+  // Output variable name
+  variableName String @default("merge")
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  workflow     workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+  @@index([nodeId])
+}

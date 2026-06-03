@@ -1,0 +1,100 @@
+// ─────────────────────────────────────────────────────────────
+// Nodebase — Prisma Schema: Auth & Billing Models
+// User, Session, Account, Verification, BillingEvent
+// ─────────────────────────────────────────────────────────────
+
+model User {
+  id               String       @id
+  name             String
+  email            String
+  emailVerified        Boolean   @default(false)
+  emailVerifyToken     String?   @unique
+  emailVerifyExpiry    DateTime?
+  emailVerifyAttempts  Int       @default(0)
+  image            String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @default(now()) @updatedAt
+  sessions         Session[]
+  accounts         Account[]
+  workflows        workflow[]
+  credentials      Credential[]
+  executionCount   Int          @default(0)
+  executionResetAt DateTime     @default(now())
+
+  // ── Subscription / Billing ───────────────────────────────────────────────
+  plan                String    @default("FREE")     // FREE|STARTER|PRO|TEAM
+  planStatus          String    @default("active")   // active|past_due|cancelled|paused
+  razorpayCustomerId  String?   @unique              // cust_xxxx
+  razorpaySubId       String?   @unique              // sub_xxxx
+  currentPeriodEnd    DateTime?
+  cancelAtPeriodEnd   Boolean   @default(false)
+  workflowRunsUsed    Int       @default(0)
+  workflowRunsReset   DateTime  @default(now())
+  billingEvents       BillingEvent[]
+
+  @@unique([email])
+  @@map("user")
+}
+
+model BillingEvent {
+  id              String   @id @default(cuid())
+  userId          String
+  type            String   // subscription.activated | payment.captured | subscription.cancelled | etc.
+  razorpayEventId String?  @unique
+  amount          Int?     // paise
+  currency        String   @default("INR")
+  plan            String?
+  status          String   // success | failed | pending
+  rawPayload      String   @db.Text // full Razorpay webhook JSON
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([type])
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  @@map("verification")
+}

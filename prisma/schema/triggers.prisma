@@ -1,0 +1,136 @@
+// ─────────────────────────────────────────────────────────────
+// Nodebase — Prisma Schema: Trigger Models
+// WebhookTrigger, ScheduleTrigger, RazorpayTrigger,
+// WhatsAppTrigger, ErrorTriggerNode, GmailWatcher
+// ─────────────────────────────────────────────────────────────
+
+model WebhookTrigger {
+  id          String     @id @default(cuid())
+  workflowId  String     @unique
+  webhookId   String     @unique @default(uuid())
+  secretToken String
+  isActive    Boolean    @default(true)
+  httpMethod  HttpMethod @default(POST)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  workflow workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId])
+  @@index([workflowId])
+}
+
+model ScheduleTrigger {
+  id                String    @id @default(cuid())
+  workflowId        String    @unique
+  cronExpression    String
+  timezone          String    @default("UTC")
+  isActive          Boolean   @default(true)
+  inngestFunctionId String    @unique
+  lastRunAt         DateTime?
+  nextRunAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  workflow workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+}
+
+model ErrorTriggerNode {
+  id           String   @id @default(cuid())
+  nodeId       String   @unique
+  workflowId   String
+
+  variableName String   @default("errorTrigger")
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  workflow     workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([nodeId])
+  @@index([workflowId])
+}
+
+model RazorpayTrigger {
+  id            String   @id @default(cuid())
+  nodeId        String   @unique
+  workflowId    String
+
+  webhookId     String   @unique @default(uuid())
+
+  // DEPRECATED — plaintext, kept for backward-compat until data migration is complete.
+  // TODO: Once all rows have webhookSecretEncrypted set and webhookSecret IS NULL,
+  // create a follow-up migration to: DROP COLUMN webhookSecret and set
+  // webhookSecretEncrypted NOT NULL.
+  webhookSecret          String?  // legacy plaintext (pre-encryption rows)
+
+  // AES-256 encrypted webhook secret. Prefer this over webhookSecret.
+  // Populated by new saves and by `npm run migrate:razorpay-secrets`.
+  webhookSecretEncrypted String?  // encrypted; null until migrated
+
+  activeEvents  String   @default("[]") @db.Text
+  variableName  String   @default("razorpayTrigger")
+  isActive      Boolean  @default(true)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  workflow      workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([nodeId])
+  @@index([workflowId])
+  @@index([webhookId])
+}
+
+model WhatsAppTrigger {
+  id                String   @id @default(cuid())
+  nodeId            String   @unique
+  workflowId        String
+
+  webhookId         String   @unique @default(uuid())
+
+  // DEPRECATED — plaintext, kept for backward-compat until data migration is complete.
+  // TODO: Once all rows have verifyTokenEncrypted set and verifyToken IS NULL,
+  // create a follow-up migration to: DROP COLUMN verifyToken and set
+  // verifyTokenEncrypted NOT NULL.
+  verifyToken              String?  // legacy plaintext (pre-encryption rows)
+
+  // AES-256 encrypted verify token. Prefer this over verifyToken.
+  // Populated by new saves and by `npm run migrate:whatsapp-tokens`.
+  verifyTokenEncrypted     String?  // encrypted; null until migrated
+
+  phoneNumberId     String   @default("")
+  activeEvents      String   @default("[]") @db.Text
+  messageTypes      String   @default("[]") @db.Text
+  ignoreOwnMessages Boolean  @default(true)
+  variableName      String   @default("whatsappTrigger")
+  isActive          Boolean  @default(true)
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  workflow          workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([nodeId])
+  @@index([workflowId])
+  @@index([webhookId])
+}
+
+model GmailWatcher {
+  id            String   @id @default(cuid())
+  workflowId    String
+  nodeId        String   @unique
+  credentialId  String
+  email         String
+  active        Boolean  @default(true)
+  lastHistoryId String   @default("")
+  expiration    String   @default("")
+  filterQuery   String   @default("")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  workflow      workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([email, active])
+}

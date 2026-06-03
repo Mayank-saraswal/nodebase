@@ -1,0 +1,318 @@
+// ─────────────────────────────────────────────────────────────
+// Nodebase — Prisma Schema: CRM Node Models
+// ZohoCrmNode, HubspotNode, FreshdeskNode
+// ─────────────────────────────────────────────────────────────
+
+model ZohoCrmNode {
+  id           String           @id @default(cuid())
+  nodeId       String           @unique
+  workflowId   String
+  credentialId String?
+  credential   Credential? @relation(fields: [credentialId], references: [id])
+
+  operation    ZohoCrmOperation @default(CREATE_LEAD)
+  variableName String           @default("zoho")
+
+  module       String           @default("Leads")
+  recordId     String           @default("") @db.Text
+
+  // Lead / Contact shared fields
+  firstName    String           @default("") @db.Text
+  lastName     String           @default("") @db.Text
+  email        String           @default("") @db.Text
+  phone        String           @default("") @db.Text
+  mobile       String           @default("") @db.Text
+  company      String           @default("") @db.Text
+  title        String           @default("") @db.Text
+  website      String           @default("") @db.Text
+  leadSource   String           @default("")
+  leadStatus   String           @default("")
+  industry     String           @default("")
+  annualRevenue  String         @default("") @db.Text
+  noOfEmployees  String         @default("") @db.Text
+  rating       String           @default("")
+  description  String           @default("") @db.Text
+
+  // Address (Lead / Contact / Account)
+  street       String           @default("") @db.Text
+  city         String           @default("") @db.Text
+  state        String           @default("") @db.Text
+  country      String           @default("India")
+  zipCode      String           @default("") @db.Text
+
+  // Deal fields
+  dealName     String           @default("") @db.Text
+  dealStage    String           @default("")
+  dealAmount   String           @default("") @db.Text
+  closingDate  String           @default("") @db.Text
+  accountName  String           @default("") @db.Text
+  contactName  String           @default("") @db.Text
+  probability  String           @default("") @db.Text
+  dealType     String           @default("")
+
+  // Account fields
+  accountOwner String           @default("") @db.Text
+  billingCity  String           @default("") @db.Text
+  billingState String           @default("") @db.Text
+
+  // Task / Activity fields
+  subject      String           @default("") @db.Text
+  dueDate      String           @default("") @db.Text
+  priority     String           @default("High")
+  status       String           @default("Not Started")
+  whoId        String           @default("") @db.Text
+  whatId       String           @default("") @db.Text
+  whoModule    String           @default("Contacts")
+  whatModule   String           @default("Deals")
+
+  // Call log fields
+  callDuration    String        @default("") @db.Text
+  callDirection   String        @default("Outbound")
+  callResult      String        @default("")
+  callStartTime   String        @default("") @db.Text
+  callDescription String        @default("") @db.Text
+
+  // Meeting fields
+  meetingStart  String          @default("") @db.Text
+  meetingEnd    String          @default("") @db.Text
+  meetingAgenda String          @default("") @db.Text
+  participants  String          @default("[]") @db.Text
+
+  // Note fields
+  noteTitle    String           @default("") @db.Text
+  noteContent  String           @default("") @db.Text
+  parentModule String           @default("Leads")
+
+  // Search / filter fields
+  searchTerm   String           @default("") @db.Text
+  searchField  String           @default("Email")
+  criteria     String           @default("") @db.Text
+  page         Int              @default(1)
+  perPage      Int              @default(10)
+
+  // Convert lead
+  createDeal   Boolean          @default(false)
+  overwrite    Boolean          @default(false)
+
+  // Custom fields JSON — escape hatch for any Zoho field not listed above
+  customFields String           @default("{}") @db.Text
+
+  // Upsert
+  duplicateCheckField String    @default("Email")
+
+  continueOnFail Boolean        @default(false)
+
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  workflow     workflow         @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+  @@index([nodeId])
+}
+
+model HubspotNode {
+  id           String           @id @default(cuid())
+  nodeId       String           @unique
+  workflowId   String
+  credentialId String?
+  credential   Credential?      @relation(fields: [credentialId], references: [id])
+
+  operation    HubspotOperation @default(CREATE_CONTACT)
+  variableName String           @default("hubspot")
+
+  // ── OBJECT TYPE (for generic ops) ────────────────────────
+  objectType   String           @default("contacts")
+
+  // ── RECORD IDENTIFICATION ─────────────────────────────────
+  recordId     String           @default("") @db.Text
+
+  // ── CONTACT FIELDS ────────────────────────────────────────
+  email        String           @default("") @db.Text
+  firstName    String           @default("") @db.Text
+  lastName     String           @default("") @db.Text
+  phone        String           @default("") @db.Text
+  website      String           @default("") @db.Text
+  company      String           @default("") @db.Text
+  jobTitle     String           @default("") @db.Text
+  lifecycleStage String         @default("")
+  leadStatus   String           @default("")
+
+  // ── COMPANY FIELDS ────────────────────────────────────────
+  companyName  String           @default("") @db.Text
+  domain       String           @default("") @db.Text
+  industry     String           @default("")
+  annualRevenue String          @default("") @db.Text
+  numberOfEmployees String      @default("") @db.Text
+  city         String           @default("") @db.Text
+  state        String           @default("") @db.Text
+  country      String           @default("India")
+
+  // ── DEAL FIELDS ───────────────────────────────────────────
+  dealName     String           @default("") @db.Text
+  dealStage    String           @default("")
+  pipeline     String           @default("default")
+  amount       String           @default("") @db.Text
+  closeDate    String           @default("") @db.Text
+  dealType     String           @default("")
+  priority     String           @default("")
+
+  // ── TICKET FIELDS ─────────────────────────────────────────
+  ticketName   String           @default("") @db.Text
+  ticketPipeline String         @default("0")
+  ticketStatus String           @default("")
+  ticketPriority String         @default("")
+  ticketDescription String      @default("") @db.Text
+  ticketSource String           @default("")
+
+  // ── ACTIVITY FIELDS ───────────────────────────────────────
+  noteBody     String           @default("") @db.Text
+  taskSubject  String           @default("") @db.Text
+  taskBody     String           @default("") @db.Text
+  taskStatus   String           @default("NOT_STARTED")
+  taskPriority String           @default("NONE")
+  taskDueDate  String           @default("") @db.Text
+  callBody     String           @default("") @db.Text
+  callDuration String           @default("") @db.Text
+  callDirection String          @default("OUTBOUND")
+  callDisposition String        @default("")
+  emailSubject String           @default("") @db.Text
+  emailBody    String           @default("") @db.Text
+  emailFrom    String           @default("") @db.Text
+  emailTo      String           @default("") @db.Text
+
+  // ── ASSOCIATION FIELDS ────────────────────────────────────
+  fromObjectType String         @default("contacts")
+  fromObjectId   String         @default("") @db.Text
+  toObjectType   String         @default("deals")
+  toObjectId     String         @default("") @db.Text
+  associationType String        @default("")
+
+  // ── LIST FIELDS ───────────────────────────────────────────
+  listId       String           @default("") @db.Text
+
+  // ── SEARCH / FILTER FIELDS ────────────────────────────────
+  searchQuery  String           @default("") @db.Text
+  filterProperty String         @default("")
+  filterOperator String         @default("EQ")
+  filterValue  String           @default("") @db.Text
+  sortProperty String           @default("createdate")
+  sortDirection String          @default("DESCENDING")
+  limit        Int              @default(10)
+  after        String           @default("")
+
+  // ── CUSTOM PROPERTIES (JSON) ──────────────────────────────
+  // Escape hatch for any HubSpot property not listed above
+  customProperties String       @default("{}") @db.Text
+
+  continueOnFail Boolean        @default(false)
+
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  workflow     workflow         @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+  @@index([nodeId])
+}
+
+model FreshdeskNode {
+  id           String             @id @default(cuid())
+  nodeId       String             @unique
+  workflowId   String
+  credentialId String?
+  credential   Credential?        @relation(fields: [credentialId], references: [id])
+
+  operation    FreshdeskOperation @default(CREATE_TICKET)
+  variableName String             @default("freshdesk")
+
+  // ── TICKET FIELDS ─────────────────────────────────────────
+  subject      String             @default("") @db.Text
+  description  String             @default("") @db.Text
+  descriptionHtml String          @default("") @db.Text
+  email        String             @default("") @db.Text
+  name         String             @default("") @db.Text
+  phone        String             @default("") @db.Text
+  mobilePhone  String             @default("") @db.Text
+  subject2     String             @default("") @db.Text
+  ticketId     String             @default("") @db.Text
+
+  // Priority: 1=Low, 2=Medium, 3=High, 4=Urgent
+  priority     Int                @default(2)
+
+  // Status: 2=Open, 3=Pending, 4=Resolved, 5=Closed
+  status       Int                @default(2)
+
+  // Source: 1=Email, 2=Portal, 3=Phone, 7=Chat, 9=Twitter DM, 10=WhatsApp
+  source       Int                @default(2)
+
+  // Type: Question, Incident, Problem, Feature Request, Refund Request, etc.
+  ticketType   String             @default("")
+
+  responderId  String             @default("") @db.Text
+  groupId      String             @default("") @db.Text
+  productId    String             @default("") @db.Text
+  companyId    String             @default("") @db.Text
+  fwdEmail     String             @default("") @db.Text
+
+  // Tags — comma-separated list
+  tags         String             @default("") @db.Text
+
+  // Custom fields JSON — { "cf_order_id": "ORD-123" }
+  customFields String             @default("{}") @db.Text
+
+  // ── NOTE FIELDS ───────────────────────────────────────────
+  noteId       String             @default("") @db.Text
+  noteBody     String             @default("") @db.Text
+  notePrivate  Boolean            @default(false)
+  noteUserId   String             @default("") @db.Text
+
+  // ── CONTACT FIELDS ────────────────────────────────────────
+  contactId    String             @default("") @db.Text
+  contactEmail String             @default("") @db.Text
+  contactName  String             @default("") @db.Text
+  contactPhone String             @default("") @db.Text
+  contactMobile String            @default("") @db.Text
+  contactJobTitle String          @default("") @db.Text
+  contactTimeZone String          @default("") @db.Text
+  contactLanguage String          @default("") @db.Text
+  contactTags  String             @default("") @db.Text
+  contactCompanyId String         @default("") @db.Text
+  mergeTargetId String            @default("") @db.Text
+
+  // ── COMPANY FIELDS ────────────────────────────────────────
+  companyName  String             @default("") @db.Text
+  companyDomain String            @default("") @db.Text
+  companyDescription String       @default("") @db.Text
+  companyNote  String             @default("") @db.Text
+
+  // ── AGENT FIELDS ──────────────────────────────────────────
+  agentId      String             @default("") @db.Text
+
+  // ── REPLY FIELDS ──────────────────────────────────────────
+  replyBody    String             @default("") @db.Text
+  replyFrom    String             @default("") @db.Text
+  replyTo      String             @default("") @db.Text
+  replyCc      String             @default("") @db.Text
+  replyBcc     String             @default("") @db.Text
+
+  // ── SEARCH / FILTER FIELDS ────────────────────────────────
+  searchQuery  String             @default("") @db.Text
+  filterBy     String             @default("")
+  orderBy      String             @default("created_at")
+  orderType    String             @default("desc")
+  page         Int                @default(1)
+  perPage      Int                @default(30)
+  updatedSince String             @default("") @db.Text
+  includeStats Boolean            @default(false)
+
+  continueOnFail Boolean          @default(false)
+
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  workflow     workflow           @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+  @@index([nodeId])
+}

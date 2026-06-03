@@ -23,7 +23,7 @@ import prisma from "./db"
  trustedOrigins: [
     "https://nodebase.mayanksaraswal.in",
     "https://www.nodebase.mayanksaraswal.in",
-    // DigitalOcean App Platform URLs are handled by nodebase.mayanksaraswal.in domain
+    "https://nodebase-l8md4.ondigitalocean.app",
     "https://vast-lemur-notable.ngrok-free.app",
     "http://localhost:3000"
  ],
