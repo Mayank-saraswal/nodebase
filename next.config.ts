@@ -4,6 +4,15 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: "standalone",
   devIndicators: false,
+  // AWS SDK v3 uses deep subpath exports that Turbopack can't resolve —
+  // mark them as external so Node.js handles module resolution natively
+  serverExternalPackages: [
+    "@aws-sdk/client-s3",
+    "@aws-sdk/s3-request-presigner",
+    "@aws-sdk/core",
+    "@aws-sdk/signature-v4-multi-region",
+    "@smithy/core",
+  ],
   async redirects() {
 
     return [];

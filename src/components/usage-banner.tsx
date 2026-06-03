@@ -2,33 +2,41 @@
 
 import { useTRPC } from "@/trpc/client"
 import { useQuery } from "@tanstack/react-query"
-import { authClient } from "@/lib/auth-client"
+import { useRouter } from "next/navigation"
 import { ZapIcon, SparklesIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { PLAN_LIMITS } from "@/lib/plan-limits"
 
 export const UsageBanner = () => {
   const trpc = useTRPC()
+  const router = useRouter()
   const { data, isLoading } = useQuery(
-    trpc.usage.getMyUsage.queryOptions()
+    trpc.billing.getStatus.queryOptions()
   )
 
   if (isLoading || !data) return null
 
-  // Pro user — show small badge only
-  if (data.isPro) {
+  const plan = (data.plan || "FREE") as keyof typeof PLAN_LIMITS
+  const planInfo = PLAN_LIMITS[plan] ?? PLAN_LIMITS.FREE
+
+  // Paid user with unlimited runs — show small badge only
+  if (plan !== "FREE" && data.planStatus === "active") {
     return (
       <div className="flex items-center gap-2 px-4 py-2 bg-orange-500/10 border-b border-orange-500/20">
         <SparklesIcon className="size-3.5 text-orange-500" />
         <span className="text-xs font-medium text-orange-500">
-          Pro Plan — Unlimited executions
+          {planInfo.name} Plan — {planInfo.runs.toLocaleString()} runs/month
         </span>
       </div>
     )
   }
 
   // Free user — show usage bar
-  const isNearLimit = data.percentUsed >= 80
-  const isAtLimit = data.percentUsed >= 100
+  const used = data.quota.used
+  const limit = data.quota.limit
+  const percentUsed = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0
+  const isNearLimit = percentUsed >= 80
+  const isAtLimit = percentUsed >= 100
 
   return (
     <div
@@ -52,7 +60,7 @@ export const UsageBanner = () => {
           }`}
         />
         <span className="text-xs text-muted-foreground whitespace-nowrap">
-          Free Plan:
+          {planInfo.name} Plan:
         </span>
         <span
           className={`text-xs font-semibold whitespace-nowrap ${
@@ -63,7 +71,7 @@ export const UsageBanner = () => {
                 : "text-foreground"
           }`}
         >
-          {data.executionCount} / {data.executionLimit} executions
+          {used.toLocaleString()} / {limit.toLocaleString()} runs
         </span>
 
         {/* Progress bar */}
@@ -76,17 +84,9 @@ export const UsageBanner = () => {
                   ? "bg-amber-500"
                   : "bg-orange-500"
             }`}
-            style={{ width: `${data.percentUsed}%` }}
+            style={{ width: `${percentUsed}%` }}
           />
         </div>
-
-        <span className="text-xs text-muted-foreground whitespace-nowrap">
-          Resets{" "}
-          {new Date(data.resetAt).toLocaleDateString("en-IN", {
-            month: "short",
-            day: "numeric",
-          })}
-        </span>
       </div>
 
       {/* Right: upgrade button */}
@@ -94,9 +94,9 @@ export const UsageBanner = () => {
         size="sm"
         variant="default"
         className="h-7 text-xs bg-orange-500 hover:bg-orange-600 text-white shrink-0"
-        onClick={() => authClient.checkout({ slug: "pro" })}
+        onClick={() => router.push("/pricing")}
       >
-        Upgrade to Pro
+        Upgrade Plan
       </Button>
     </div>
   )

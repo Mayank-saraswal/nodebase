@@ -313,7 +313,7 @@ export const gmailExecutor: NodeExecutor<GmailData> = async ({
             )
           }
 
-          // Large attachment handling: offload to Azure Blob to avoid DB bloat
+          // Large attachment handling: offload to DigitalOcean Spaces to avoid DB bloat
           let finalAttachmentData = attachmentData
           let finalAttachmentName = attachmentName
           let finalBody = body
@@ -332,9 +332,9 @@ export const gmailExecutor: NodeExecutor<GmailData> = async ({
               const sizeKb = (uploadResult.sizeBytes / 1024).toFixed(0)
               const displayName = attachmentName || "attachment"
               const downloadLink = config.isHtml
-                ? `<p><a href="${uploadResult.url}" download="${displayName}">` +
+                ? `<p><a href="${uploadResult.publicUrl}" download="${displayName}">` +
                   `\uD83D\uDCCE Download ${displayName} (${sizeKb}KB)</a></p>`
-                : `\n\nDownload ${displayName} (${sizeKb}KB): ${uploadResult.url}`
+                : `\n\nDownload ${displayName} (${sizeKb}KB): ${uploadResult.publicUrl}`
               finalBody = finalBody + downloadLink
               finalAttachmentData = "" // clear attachment from email
               finalAttachmentName = ""

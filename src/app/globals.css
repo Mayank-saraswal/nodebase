@@ -151,63 +151,84 @@
 }
 
 .dark {
-  --background: oklch(0.2598 0.0306 262.6666);
-  --foreground: oklch(0.9219 0 0);
-  --card: oklch(0.3106 0.0301 268.6365);
-  --card-foreground: oklch(0.9219 0 0);
-  --popover: oklch(0.29 0.0249 268.3986);
-  --popover-foreground: oklch(0.9219 0 0);
+  /* Pure black base - clean, professional */
+  --background: oklch(0.17 0 0);
+  --foreground: oklch(0.95 0 0);
+  --card: oklch(0.2 0 0);
+  --card-foreground: oklch(0.95 0 0);
+  --popover: oklch(0.18 0 0);
+  --popover-foreground: oklch(0.95 0 0);
+
+  /* Brand (orange stays the same in dark mode) */
   --primary: oklch(0.6397 0.172 36.4421);
   --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.3095 0.0266 266.7132);
-  --secondary-foreground: oklch(0.9219 0 0);
-  --muted: oklch(0.3095 0.0266 266.7132);
-  --muted-foreground: oklch(0.7155 0 0);
-  --accent: oklch(0.338 0.0589 267.5867);
-  --accent-foreground: oklch(0.8823 0.0571 254.1284);
+
+  /* Surfaces */
+  --secondary: oklch(0.24 0 0);
+  --secondary-foreground: oklch(0.95 0 0);
+  --muted: oklch(0.24 0 0);
+  --muted-foreground: oklch(0.65 0 0);
+  --accent: oklch(0.26 0 0);
+  --accent-foreground: oklch(0.95 0 0);
+
+  /* Destructive */
   --destructive: oklch(0.6368 0.2078 25.3313);
-  --border: oklch(0.3843 0.0301 269.7337);
-  --input: oklch(0.3843 0.0301 269.7337);
+  --destructive-foreground: oklch(1 0 0);
+
+  /* Lines and inputs */
+  --border: oklch(0.3 0 0);
+  --input: oklch(0.3 0 0);
   --ring: oklch(0.6397 0.172 36.4421);
+
+  /* Charts */
   --chart-1: oklch(0.7156 0.0605 248.6845);
   --chart-2: oklch(0.7693 0.0876 34.1875);
   --chart-3: oklch(0.5778 0.0759 254.1573);
   --chart-4: oklch(0.5016 0.0849 259.4902);
   --chart-5: oklch(0.425241 0.0952 264.0306);
-  --sidebar: oklch(0.31 0.0283 267.7408);
-  --sidebar-foreground: oklch(0.9219 0 0);
+
+  /* Sidebar - slightly darker than main bg */
+  --sidebar: oklch(0.14 0 0);
+  --sidebar-foreground: oklch(0.95 0 0);
   --sidebar-primary: oklch(0.6397 0.172 36.4421);
   --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.338 0.0589 267.5867);
-  --sidebar-accent-foreground: oklch(0.8823 0.0571 254.1284);
-  --sidebar-border: oklch(0.3843 0.0301 269.7337);
+  --sidebar-accent: oklch(0.22 0 0);
+  --sidebar-accent-foreground: oklch(0.95 0 0);
+  --sidebar-border: oklch(0.3 0 0);
   --sidebar-ring: oklch(0.6397 0.172 36.4421);
-  --destructive-foreground: oklch(1 0 0);
+
+  /* Orange brand (same as :root) */
+  --orange: #F97316;
+  --orange-dim: #EA6C0A;
+  --orange-glow: rgba(249,115,22,0.22);
+  --orange-subtle: rgba(249,115,22,0.09);
+
+  /* Keep all utility vars */
   --radius: 0.425rem;
   --font-sans: Inter, sans-serif;
   --font-serif: Source Serif 4, serif;
   --font-mono: JetBrains Mono, monospace;
   --shadow-color: hsl(0 0% 0%);
-  --shadow-opacity: 0.1;
+  --shadow-opacity: 0.15;
   --shadow-blur: 3px;
   --shadow-spread: 0px;
   --shadow-offset-x: 0px;
   --shadow-offset-y: 1px;
   --letter-spacing: 0em;
   --spacing: 0.25rem;
-  --shadow-2xs: 0px 1px 3px 0px hsl(0 0% 0% / 0.05);
-  --shadow-xs: 0px 1px 3px 0px hsl(0 0% 0% / 0.05);
-  --shadow-sm: 0px 1px 3px 0px hsl(0 0% 0% / 0.1),
-    0px 1px 2px -1px hsl(0 0% 0% / 0.1);
-  --shadow: 0px 1px 3px 0px hsl(0 0% 0% / 0.1),
-    0px 1px 2px -1px hsl(0 0% 0% / 0.1);
-  --shadow-md: 0px 1px 3px 0px hsl(0 0% 0% / 0.1),
-    0px 2px 4px -1px hsl(0 0% 0% / 0.1);
-  --shadow-lg: 0px 1px 3px 0px hsl(0 0% 0% / 0.1),
-    0px 4px 6px -1px hsl(0 0% 0% / 0.1);
-  --shadow-xl: 0px 1px 3px 0px hsl(0 0% 0% / 0.1),
-    0px 8px 10px -1px hsl(0 0% 0% / 0.1);
-  --shadow-2xl: 0px 1px 3px 0px hsl(0 0% 0% / 0.25);
+  --shadow-2xs: 0px 1px 3px 0px hsl(0 0% 0% / 0.15);
+  --shadow-xs: 0px 1px 3px 0px hsl(0 0% 0% / 0.15);
+  --shadow-sm: 0px 1px 3px 0px hsl(0 0% 0% / 0.2),
+    0px 1px 2px -1px hsl(0 0% 0% / 0.2);
+  --shadow: 0px 1px 3px 0px hsl(0 0% 0% / 0.2),
+    0px 1px 2px -1px hsl(0 0% 0% / 0.2);
+  --shadow-md: 0px 1px 3px 0px hsl(0 0% 0% / 0.2),
+    0px 2px 4px -1px hsl(0 0% 0% / 0.2);
+  --shadow-lg: 0px 1px 3px 0px hsl(0 0% 0% / 0.2),
+    0px 4px 6px -1px hsl(0 0% 0% / 0.2);
+  --shadow-xl: 0px 1px 3px 0px hsl(0 0% 0% / 0.2),
+    0px 8px 10px -1px hsl(0 0% 0% / 0.2);
+  --shadow-2xl: 0px 1px 3px 0px hsl(0 0% 0% / 0.35);
 }
 
 @layer base {
@@ -297,4 +318,39 @@
 
 .orange-dot-pulse {
   animation: orangeDot 1.8s ease-in-out infinite;
+}
+
+/* Dark mode logo visibility */
+.dark .dark-invert {
+  filter: invert(1);
+}
+
+.dark .dark-brightness {
+  filter: brightness(0) invert(1);
+}
+
+/* Smooth scroll globally */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Dark mode marketing overrides */
+.dark .mkt-logo-chip {
+  color: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.07);
+  background-color: rgba(255, 255, 255, 0.03);
+}
+.dark .mkt-logo-chip:hover {
+  color: rgba(255, 255, 255, 0.8);
+  border-color: rgba(255, 255, 255, 0.18);
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+.dark .mkt-feature-card {
+  border-color: rgba(255, 255, 255, 0.06);
+  background-color: rgba(255, 255, 255, 0.02);
+}
+.dark .mkt-feature-card:hover {
+  border-color: rgba(249, 115, 22, 0.35);
+  background-color: rgba(249, 115, 22, 0.06);
 }

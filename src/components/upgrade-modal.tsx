@@ -8,40 +8,36 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-    AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
+import { useRouter } from "next/navigation"
 
-import { authClient } from "@/lib/auth-client"
-
-interface UpgardeModalProps{
+interface UpgradeModalProps{
     open:boolean
     onOpenChange:(open:boolean)=>void
 }
 
-export const UpgradeModal = ({open,onOpenChange}:UpgardeModalProps)=>{
+export const UpgradeModal = ({open,onOpenChange}:UpgradeModalProps)=>{
+    const router = useRouter()
+
     return(
         <AlertDialog open={open} onOpenChange={onOpenChange}>
-            
             <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>
-                        Upgrade to Pro
+                        Upgrade Your Plan
                     </AlertDialogTitle>
                     <AlertDialogDescription>
-                       You need an active subscription to perform this action, Upgrade to pro to unlock all features
+                       You need an active subscription to perform this action. Upgrade to a paid plan to unlock all features.
                     </AlertDialogDescription>
-                    
-                
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={()=>authClient.checkout({slug:"pro"})}> 
-                        Upgrade Now
+                        <AlertDialogAction onClick={()=> router.push("/pricing")}>
+                        View Plans
                         </AlertDialogAction>
                  </AlertDialogFooter>
             </AlertDialogContent>
             </AlertDialog>
-            
     )
 }

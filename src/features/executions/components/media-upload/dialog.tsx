@@ -164,7 +164,7 @@ export const MediaUploadDialog = ({
                 <DialogHeader>
                     <DialogTitle>Media Upload Configuration</DialogTitle>
                     <DialogDescription>
-                        Upload media from any source to Azure Blob Storage and receive a permanent, 48-hour SAS URL.
+                        Upload media from any source to cloud storage and receive a permanent, 48-hour presigned URL.
                     </DialogDescription>
                 </DialogHeader>
 

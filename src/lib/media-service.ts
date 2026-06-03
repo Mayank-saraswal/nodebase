@@ -1,43 +1,50 @@
 import {
-  BlobServiceClient,
-  StorageSharedKeyCredential,
-  BlobSASPermissions,
-  generateBlobSASQueryParameters,
-} from "@azure/storage-blob"
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectsCommand,
+  ListObjectsV2Command,
+} from "@aws-sdk/client-s3"
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
+import { GetObjectCommand } from "@aws-sdk/client-s3"
 
-const ACCOUNT_NAME = process.env.AZURE_STORAGE_ACCOUNT_NAME ?? ""
-const ACCOUNT_KEY = process.env.AZURE_STORAGE_ACCOUNT_KEY ?? ""
-const CONTAINER_NAME =
-  process.env.AZURE_STORAGE_CONTAINER_NAME ?? "nodebasestorage"
+const SPACES_KEY = process.env.DO_SPACES_KEY ?? ""
+const SPACES_SECRET = process.env.DO_SPACES_SECRET ?? ""
+const SPACES_ENDPOINT = process.env.DO_SPACES_ENDPOINT ?? "https://blr1.digitaloceanspaces.com"
+const SPACES_BUCKET = process.env.DO_SPACES_BUCKET ?? "nodebase-media"
+const SPACES_REGION = process.env.DO_SPACES_REGION ?? "blr1"
+const SPACES_CDN_URL = process.env.DO_SPACES_CDN_URL ?? ""
 const SAS_EXPIRY_HOURS = parseInt(
-  process.env.AZURE_STORAGE_SAS_EXPIRY_HOURS ?? "48"
+  process.env.DO_SPACES_SAS_EXPIRY_HOURS ?? "48"
 )
 
 // Lazy-initialized client (only created when actually needed)
-let _blobServiceClient: BlobServiceClient | null = null
+let _s3Client: S3Client | null = null
 
-function getBlobServiceClient(): BlobServiceClient {
-  if (!_blobServiceClient) {
-    if (!ACCOUNT_NAME || !ACCOUNT_KEY) {
+function getS3Client(): S3Client {
+  if (!_s3Client) {
+    if (!SPACES_KEY || !SPACES_SECRET) {
       throw new Error(
-        "MediaService: AZURE_STORAGE_ACCOUNT_NAME and AZURE_STORAGE_ACCOUNT_KEY must be set"
+        "MediaService: DO_SPACES_KEY and DO_SPACES_SECRET must be set"
       )
     }
-    const credential = new StorageSharedKeyCredential(ACCOUNT_NAME, ACCOUNT_KEY)
-    _blobServiceClient = new BlobServiceClient(
-      `https://${ACCOUNT_NAME}.blob.core.windows.net`,
-      credential
-    )
+    _s3Client = new S3Client({
+      endpoint: SPACES_ENDPOINT,
+      region: SPACES_REGION,
+      credentials: {
+        accessKeyId: SPACES_KEY,
+        secretAccessKey: SPACES_SECRET,
+      },
+      forcePathStyle: false, // DO Spaces requires virtual-hosted-style
+    })
   }
-  return _blobServiceClient
+  return _s3Client
 }
 
 export interface UploadResult {
-  blobName: string // internal path
-  url: string // permanent SAS URL valid for SAS_EXPIRY_HOURS
+  blobName: string // internal path (kept for backward compat)
+  publicUrl: string // durable public URL
   mimeType: string
   sizeBytes: number
-  expiresAt: string // ISO timestamp
 }
 
 export interface MediaUploadOptions {
@@ -53,7 +60,7 @@ export async function uploadFromUrl(
   sourceUrl: string,
   opts: MediaUploadOptions
 ): Promise<UploadResult> {
-  // FIX 10: Validate URL — HTTPS only, block private/internal IP ranges
+  // Validate URL — HTTPS only, block private/internal IP ranges
   const parsed = new URL(sourceUrl)
   if (parsed.protocol !== "https:") {
     throw new Error("MediaService: Only HTTPS URLs are allowed")
@@ -108,57 +115,54 @@ export async function uploadFromBuffer(
   const ext = mimeTypeToExt(mimeType)
   const executionId = opts.executionId ?? "no-execution"
 
-  // FIX 9: Sanitize filename to prevent virtual path traversal in Azure Blob storage
+  // Sanitize filename to prevent path traversal in object storage
   const safeFilename = (opts.filename ?? `media-${Date.now()}.${ext}`)
     .replace(/[^a-zA-Z0-9._-]/g, "_")
     .slice(0, 200)
 
   // Path: uploads/{userId}/{workflowId}/{executionId}/{timestamp}-{safeFilename}
-  const blobName = `uploads/${opts.userId}/${opts.workflowId}/${executionId}/${Date.now()}-${safeFilename}`
+  const objectKey = `uploads/${opts.userId}/${opts.workflowId}/${executionId}/${Date.now()}-${safeFilename}`
 
-  const client = getBlobServiceClient()
-  const containerClient = client.getContainerClient(CONTAINER_NAME)
+  const client = getS3Client()
 
-  // Ensure container exists (idempotent)
-  await containerClient.createIfNotExists()
+  await client.send(
+    new PutObjectCommand({
+      Bucket: SPACES_BUCKET,
+      Key: objectKey,
+      Body: buffer,
+      ContentType: mimeType,
+      ACL: "private",
+    })
+  )
 
-  const blockBlobClient = containerClient.getBlockBlobClient(blobName)
-
-  await blockBlobClient.upload(buffer, buffer.length, {
-    blobHTTPHeaders: { blobContentType: mimeType },
-  })
-
-  const url = generateSasUrl(blobName)
-  const expiresAt = new Date(
-    Date.now() + SAS_EXPIRY_HOURS * 60 * 60 * 1000
-  ).toISOString()
+  const publicUrl = SPACES_CDN_URL 
+    ? `${SPACES_CDN_URL}/${objectKey}` 
+    : `https://${SPACES_BUCKET}.${SPACES_ENDPOINT.replace("https://", "")}/${objectKey}`
 
   return {
-    blobName,
-    url,
+    blobName: objectKey,
+    publicUrl,
     mimeType,
     sizeBytes: buffer.length,
-    expiresAt,
   }
 }
 
-// ── SAS URL generation ─────────────────────────────────────────────────────
+// ── Presigned URL generation ───────────────────────────────────────────────
 
-function generateSasUrl(blobName: string): string {
-  const credential = new StorageSharedKeyCredential(ACCOUNT_NAME, ACCOUNT_KEY)
-  const expiresOn = new Date(Date.now() + SAS_EXPIRY_HOURS * 60 * 60 * 1000)
+async function generatePresignedUrl(objectKey: string): Promise<string> {
+  const client = getS3Client()
+  const expiresInSeconds = SAS_EXPIRY_HOURS * 60 * 60
 
-  const sasToken = generateBlobSASQueryParameters(
-    {
-      containerName: CONTAINER_NAME,
-      blobName,
-      permissions: BlobSASPermissions.parse("r"), // read-only
-      expiresOn,
-    },
-    credential
-  ).toString()
+  const url = await getSignedUrl(
+    client,
+    new GetObjectCommand({
+      Bucket: SPACES_BUCKET,
+      Key: objectKey,
+    }),
+    { expiresIn: expiresInSeconds }
+  )
 
-  return `https://${ACCOUNT_NAME}.blob.core.windows.net/${CONTAINER_NAME}/${blobName}?${sasToken}`
+  return url
 }
 
 // ── Convenience: auto-detect source type and upload ───────────────────────
@@ -215,16 +219,44 @@ export async function deleteWorkflowMedia(
   userId: string,
   workflowId: string
 ): Promise<number> {
-  const client = getBlobServiceClient()
-  const containerClient = client.getContainerClient(CONTAINER_NAME)
+  const client = getS3Client()
   const prefix = `uploads/${userId}/${workflowId}/`
 
   let deleted = 0
-  for await (const blob of containerClient.listBlobsFlat({ prefix })) {
-    await containerClient.deleteBlob(blob.name, {
-      deleteSnapshots: "include",
-    })
-    deleted++
-  }
+  let continuationToken: string | undefined
+
+  do {
+    const listResult = await client.send(
+      new ListObjectsV2Command({
+        Bucket: SPACES_BUCKET,
+        Prefix: prefix,
+        ContinuationToken: continuationToken,
+      })
+    )
+
+    const objects = listResult.Contents
+    if (objects && objects.length > 0) {
+      const response = await client.send(
+        new DeleteObjectsCommand({
+          Bucket: SPACES_BUCKET,
+          Delete: {
+            Objects: objects.map((obj) => ({ Key: obj.Key! })),
+            Quiet: false,
+          },
+        })
+      )
+      
+      if (response.Errors && response.Errors.length > 0) {
+        throw new Error(`MediaService: Failed to delete some objects: ${response.Errors.map((e) => e.Key).join(", ")}`)
+      }
+
+      if (response.Deleted) {
+        deleted += response.Deleted.length
+      }
+    }
+
+    continuationToken = listResult.NextContinuationToken
+  } while (continuationToken)
+
   return deleted
 }

@@ -1,0 +1,12 @@
+{
+  "name": "Nodebase",
+  "short_name": "Nodebase",
+  "description": "Workflow automation for India",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#111111",
+  "theme_color": "#F97316",
+  "icons": [
+    { "src": "/logos/logo.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

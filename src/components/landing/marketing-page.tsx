@@ -152,8 +152,8 @@ const PRICING_TIERS = [
     price: "₹0",
     sub: "/month",
     features: [
-      "50 executions/month",
-      "3 workflows",
+      "100 workflow runs/month",
+      "5 workflows",
       "All nodes included",
       "Community support",
     ],
@@ -161,30 +161,43 @@ const PRICING_TIERS = [
     cta: "Start free",
   },
   {
-    title: "Pro",
+    title: "Starter",
     price: "₹999",
     sub: "/month",
     features: [
-      "Unlimited executions",
-      "Unlimited workflows",
-      "Priority support",
-      "Custom webhooks",
-    ],
-    featured: true,
-    cta: "Start 14-day trial",
-  },
-  {
-    title: "Enterprise",
-    price: "Custom",
-    sub: "pricing",
-    features: [
-      "Everything in Pro",
-      "Dedicated instance",
-      "SLA guarantee",
-      "Custom nodes",
+      "10,000 workflow runs/month",
+      "50 workflows",
+      "Email support",
+      "All triggers",
     ],
     featured: false,
-    cta: "Contact us",
+    cta: "Subscribe Now",
+  },
+  {
+    title: "Pro",
+    price: "₹2,499",
+    sub: "/month",
+    features: [
+      "100,000 workflow runs/month",
+      "Unlimited workflows",
+      "Priority support",
+      "API access",
+    ],
+    featured: true,
+    cta: "Go Pro",
+  },
+  {
+    title: "Team",
+    price: "₹5,999",
+    sub: "/month",
+    features: [
+      "500,000 workflow runs/month",
+      "Unlimited workflows",
+      "Team collaboration",
+      "SLA guarantee",
+    ],
+    featured: false,
+    cta: "Contact Sales",
   },
 ];
 
@@ -957,7 +970,7 @@ function Pricing() {
           </h2>
         </div>
 
-        <div className="mt-16 grid gap-6 md:grid-cols-3">
+        <div className="mt-16 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           {PRICING_TIERS.map((tier, i) => (
             <div
               key={tier.title}

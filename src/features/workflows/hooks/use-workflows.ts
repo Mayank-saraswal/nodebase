@@ -135,7 +135,7 @@ export const useExecuteWorkflow = ()=>{
            toast.success(`Workflow "${data.name}" executed`)
            
            queryClient.invalidateQueries(
-            trpc.usage.getMyUsage.queryOptions()
+            trpc.billing.getStatus.queryOptions()
            )
         },
         onError: (error)=>{

@@ -152,7 +152,7 @@ export const aiExecutor: NodeExecutor<AiNodeData> = async ({
       throw new NonRetriableError(`AI call failed: ${msg}`)
     }
 
-    // ── Media upload: persist generated images to Azure Blob immediately ──
+    // ── Media upload: persist generated images to DigitalOcean Spaces immediately ──
     // This prevents temp DALL-E/Gemini URLs from expiring before consumer nodes run.
     const executionId = (context.__executionId as string) ?? undefined
     const mediaOpts = {
@@ -172,7 +172,7 @@ export const aiExecutor: NodeExecutor<AiNodeData> = async ({
               ...mediaOpts,
               filename: `generated-image-${i}.png`,
             })
-            return result.url
+            return result.publicUrl
           } catch (err) {
             // Log but don't crash — return original URL as fallback
             console.error(`MediaService: Failed to upload image ${i}:`, err)
@@ -184,7 +184,7 @@ export const aiExecutor: NodeExecutor<AiNodeData> = async ({
       persistedImageUrl = persistedImageUrls[0] ?? ""
     }
 
-    // Build finalOutput — replace temp URLs with persisted Azure Blob URLs
+    // Build finalOutput — replace temp URLs with persisted cloud storage URLs
     const finalOutput = {
       ...output,
       ...(persistedImageUrls.length > 0

@@ -1,6 +1,5 @@
 import type { NodeExecutor } from "@/features/executions/types";
 import { manualTriggerChannel } from "@/inngest/channels/manual-trigger";
-import { retry } from "@polar-sh/sdk/lib/retries.js";
 
 
 type ManualTriggerData = Record<string, unknown>;

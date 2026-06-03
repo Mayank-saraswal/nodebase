@@ -1,8 +1,6 @@
 import {betterAuth} from "better-auth"
 import { prismaAdapter } from "better-auth/adapters/prisma"
 import prisma from "./db"
-import {checkout, polar, portal} from "@polar-sh/better-auth"
-import { polarcliet } from "./polar"
 
 export const auth = betterAuth({
  database: prismaAdapter(prisma,{
@@ -10,12 +8,13 @@ export const auth = betterAuth({
  }),
  emailAndPassword:{
     enabled:true,
-    autoSignIn:true
+    autoSignIn:true,
+    requireEmailVerification: true
  },
  trustedOrigins: [
     "https://nodebase.tech",
     "https://www.nodebase.tech",
-    "https://nodebase-app.bravefield-c424876c.eastasia.azurecontainerapps.io",
+    // DigitalOcean App Platform URLs are handled by nodebase.tech domain
     "https://vast-lemur-notable.ngrok-free.app",
     "http://localhost:3000"
  ],
@@ -29,25 +28,7 @@ export const auth = betterAuth({
       clientSecret:process.env.GOOGLE_CLIENT_SECRET as string
    }
  },
- plugins:[
-   polar({
-      client: polarcliet,
-      createCustomerOnSignUp:true,
-      use:[
-         checkout({
-            products:[
-               {
-                  productId:"fd0604e2-5c74-4627-b907-f3cdb8662398",
-                  slug: "pro"
-               }
-            ],
-            successUrl:process.env.POLAR_SUCCESS_URL,
-            authenticatedUsersOnly:true
-         }),
-         portal()
-      ]
-   })
- ],
+ plugins:[],
  baseURL: process.env.BETTER_AUTH_URL,
  secret: process.env.BETTER_AUTH_SECRET
 });

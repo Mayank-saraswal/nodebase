@@ -19,7 +19,10 @@ model User {
   id               String       @id
   name             String
   email            String
-  emailVerified    Boolean      @default(false)
+  emailVerified        Boolean   @default(false)
+  emailVerifyToken     String?   @unique
+  emailVerifyExpiry    DateTime?
+  emailVerifyAttempts  Int       @default(0)
   image            String?
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @default(now()) @updatedAt
@@ -30,8 +33,37 @@ model User {
   executionCount   Int          @default(0)
   executionResetAt DateTime     @default(now())
 
+  // ── Subscription / Billing ───────────────────────────────────────────────
+  plan                String    @default("FREE")     // FREE|STARTER|PRO|TEAM
+  planStatus          String    @default("active")   // active|past_due|cancelled|paused
+  razorpayCustomerId  String?   @unique              // cust_xxxx
+  razorpaySubId       String?   @unique              // sub_xxxx
+  currentPeriodEnd    DateTime?
+  cancelAtPeriodEnd   Boolean   @default(false)
+  workflowRunsUsed    Int       @default(0)
+  workflowRunsReset   DateTime  @default(now())
+  billingEvents       BillingEvent[]
+
   @@unique([email])
   @@map("user")
+}
+
+model BillingEvent {
+  id              String   @id @default(cuid())
+  userId          String
+  type            String   // subscription.activated | payment.captured | subscription.cancelled | etc.
+  razorpayEventId String?  @unique
+  amount          Int?     // paise
+  currency        String   @default("INR")
+  plan            String?
+  status          String   // success | failed | pending
+  rawPayload      String   @db.Text // full Razorpay webhook JSON
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([type])
 }
 
 model Session {

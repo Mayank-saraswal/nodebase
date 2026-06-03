@@ -55,10 +55,9 @@ export const mediaUploadExecutor: NodeExecutor = async ({
       return {
         ...context,
         [config.variableName]: {
-          url: result.url,
+          url: result.publicUrl,
           mimeType: result.mimeType,
           sizeBytes: result.sizeBytes,
-          expiresAt: result.expiresAt,
           originalSource: inputFieldVal,
         },
       }

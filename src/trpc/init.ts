@@ -2,8 +2,9 @@ import { initTRPC , TRPCError} from '@trpc/server';
 import { cache } from 'react';
 import { auth } from '@/lib/auth';
 import { headers } from 'next/headers';
-import { polarcliet } from '@/lib/polar';
 import superjson from 'superjson';
+import prisma from '@/lib/db';
+
 export const createTRPCContext = cache(async () => {
   const session = await auth.api.getSession({
     headers: await headers(),
@@ -41,21 +42,22 @@ export const protectedProcedure = baseProcedure.use(async ({ ctx, next }) => {
 });
 export const premiumProcedure = protectedProcedure.use(
   async ({ ctx, next }) => {
-    const customer = await polarcliet.customers.getStateExternal({
-      externalId: ctx.auth.user.id
+    const user = await prisma.user.findUnique({
+      where: { id: ctx.auth.user.id },
+      select: { plan: true, planStatus: true },
     })
 
-    if(!customer.activeSubscriptions || customer.activeSubscriptions.length === 0){
+    if (!user || user.plan === 'FREE' || user.planStatus !== 'active') {
       throw new TRPCError({
         code: 'FORBIDDEN',
-        message: 'Active subscription required ',
+        message: 'Active subscription required. Upgrade your plan at /pricing',
       })
     }
 
     return next({
-      ctx:{
+      ctx: {
         ...ctx,
-        customer
+        userPlan: user.plan,
       }
     })
   }

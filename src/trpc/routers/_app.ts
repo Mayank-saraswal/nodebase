@@ -13,7 +13,7 @@ import { scheduleTriggerRouter } from '@/server/routers/schedule-trigger.router'
 import { ifElseRouter } from '@/server/routers/if-else.router';
 import { gmailRouter } from '@/server/routers/gmail.router';
 import { setVariableRouter } from '@/server/routers/set-variable.router';
-import { usageRouter } from '@/server/routers/usage.router';
+import { billingRouter } from '@/server/routers/billing.router';
 import { googleSheetsRouter } from '@/server/routers/google-sheets.router';
 import { googleDriveRouter } from '@/server/routers/google-drive.router';
 import { whatsappRouter } from '@/server/routers/whatsapp.router';
@@ -51,7 +51,7 @@ export const appRouter = createTRPCRouter({
   ifElse: ifElseRouter,
   gmail: gmailRouter,
   setVariable: setVariableRouter,
-  usage: usageRouter,
+  billing: billingRouter,
   googleSheets: googleSheetsRouter,
   googleDrive: googleDriveRouter,
   code: codeRouter,

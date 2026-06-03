@@ -1,6 +1,5 @@
 import type { NodeExecutor } from "@/features/executions/types";
 import { stripeTriggerChannel } from "@/inngest/channels/stripe-trigger";
-import { retry } from "@polar-sh/sdk/lib/retries.js";
 
 
 type StripeTriggerData = Record<string, unknown>;
