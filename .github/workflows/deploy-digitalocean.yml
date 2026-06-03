@@ -57,8 +57,19 @@ jobs:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
       - name: Deploy to App Platform
+        env:
+          APP_ID: ${{ secrets.APP_ID }}
+          APP_NAME: nodebase
         run: |
-          APP_ID=$(doctl apps list --format ID --no-header | head -1)
+          if [ -z "$APP_ID" ]; then
+            for candidate_id in $(doctl apps list --format ID --no-header); do
+              candidate_name=$(doctl apps get "$candidate_id" --format Spec.Name --no-header)
+              if [ "$candidate_name" = "$APP_NAME" ]; then
+                APP_ID="$candidate_id"
+                break
+              fi
+            done
+          fi
           if [ -z "$APP_ID" ]; then
             echo "❌ No App Platform app found. Create one first in DigitalOcean console."
             exit 1

@@ -11,4 +11,4 @@ export const postgresChannel = (nodeId?: string) =>
       nodeId: string
       status: "loading" | "success" | "error"
     }>()
-  )
+  )()

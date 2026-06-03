@@ -782,7 +782,7 @@ export const postgresExecutor: NodeExecutor = async ({
       })
     })
   } catch (err) {
-    await publish(postgresChannel(nodeId).topics.status({ nodeId, status: "error" }))
+    await publish(postgresChannel(nodeId).status({ nodeId, status: "error" }))
 
     if (err instanceof NonRetriableError) throw err
 
@@ -802,7 +802,7 @@ export const postgresExecutor: NodeExecutor = async ({
     }
   }
 
-  await publish(postgresChannel(nodeId).topics.status({ nodeId, status: "success" }))
+  await publish(postgresChannel(nodeId).status({ nodeId, status: "success" }))
 
   // Return merged context
   return { ...context, [variableName]: result! }
