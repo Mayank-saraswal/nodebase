@@ -42,6 +42,11 @@ export function useRazorpay() {
       return
     }
 
+    if (!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID) {
+      onError("Payment gateway configuration is missing (Razorpay Key).")
+      return
+    }
+
     const options = {
       key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
       subscription_id: subscriptionId,

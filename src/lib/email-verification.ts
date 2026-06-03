@@ -6,6 +6,15 @@ export function generateVerifyToken(): string {
   return crypto.randomBytes(32).toString("hex")
 }
 
+export function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 // Token expiry: 24 hours from now
 export function getTokenExpiry(): Date {
   const expiry = new Date()
@@ -67,7 +76,7 @@ export async function sendVerificationEmail(
                 Verify your email address
               </h2>
               <p style="margin:0 0 24px;color:#999;font-size:15px;line-height:1.6;">
-                Hi ${userName}, click the button below to verify your email and
+                Hi ${escapeHtml(userName)}, click the button below to verify your email and
                 activate your Nodebase account. This link expires in 24 hours.
               </p>
 
@@ -99,7 +108,7 @@ export async function sendVerificationEmail(
     text: `
 Verify your Nodebase account
 
-Hi ${userName}, click the link below to verify your email address:
+Hi ${escapeHtml(userName)}, click the link below to verify your email address:
 ${verifyUrl}
 
 This link expires in 24 hours.
@@ -156,7 +165,7 @@ export async function sendResendVerificationEmail(
                 Verify your email address
               </h2>
               <p style="margin:0 0 24px;color:#999;font-size:15px;line-height:1.6;">
-                Hi ${userName}, click the button below to verify your email and
+                Hi ${escapeHtml(userName)}, click the button below to verify your email and
                 activate your Nodebase account. This link expires in 24 hours.
               </p>
 
@@ -188,7 +197,7 @@ export async function sendResendVerificationEmail(
     text: `
 Verify your Nodebase account
 
-Hi ${userName}, click the link below to verify your email address:
+Hi ${escapeHtml(userName)}, click the link below to verify your email address:
 ${verifyUrl}
 
 This link expires in 24 hours.

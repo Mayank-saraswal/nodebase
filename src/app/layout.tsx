@@ -84,7 +84,7 @@ export const metadata: Metadata = {
     description:
       "The n8n/Zapier alternative for Indian businesses. " +
       "Native Razorpay, Cashfree, MSG91 integrations.",
-    images: ["/og-image.png"],
+    images: ["/opengraph-image"],
     creator: "@nodebasetech",
   },
   alternates: {

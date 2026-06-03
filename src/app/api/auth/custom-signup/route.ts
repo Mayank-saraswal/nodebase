@@ -19,6 +19,9 @@ export async function POST(req: NextRequest) {
       if (existing.emailVerified) {
         return NextResponse.json({ error: "An account with this email already exists." }, { status: 400 })
       } else {
+        if (existing.emailVerifyAttempts >= 5) {
+          return NextResponse.json({ error: "Too many verification attempts. Try again later." }, { status: 429 })
+        }
         // Resend verification to unverified account
         const token = generateVerifyToken()
         await prisma.user.update({
@@ -26,7 +29,6 @@ export async function POST(req: NextRequest) {
           data: {
             emailVerifyToken: token,
             emailVerifyExpiry: getTokenExpiry(),
-            emailVerifyAttempts: 0,
           },
         })
         try {

@@ -7,17 +7,21 @@ function verifyWebhookSignature(
   signature: string,
   secret: string
 ): boolean {
-  const expected = crypto
-    .createHmac("sha256", secret)
-    .update(body)
-    .digest("hex")
+  try {
+    const expected = crypto
+      .createHmac("sha256", secret)
+      .update(body)
+      .digest("hex")
 
-  if (expected.length !== signature.length) return false
+    if (expected.length !== signature.length) return false
 
-  return crypto.timingSafeEqual(
-    Buffer.from(expected, "hex"),
-    Buffer.from(signature, "hex")
-  )
+    return crypto.timingSafeEqual(
+      Buffer.from(expected, "hex"),
+      Buffer.from(signature, "hex")
+    )
+  } catch {
+    return false
+  }
 }
 
 export async function POST(req: NextRequest) {

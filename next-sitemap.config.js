@@ -36,8 +36,5 @@ module.exports = {
         disallow: ["/workflows/", "/editor/", "/settings/"],
       },
     ],
-    additionalSitemaps: [
-      "https://nodebase.tech/sitemap.xml",
-    ],
   },
 }

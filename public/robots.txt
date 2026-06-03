@@ -1,0 +1,20 @@
+# *
+User-agent: *
+Allow: /
+Disallow: /workflows/
+Disallow: /editor/
+Disallow: /settings/
+Disallow: /api/
+
+# Googlebot
+User-agent: Googlebot
+Allow: /
+Disallow: /workflows/
+Disallow: /editor/
+Disallow: /settings/
+
+# Host
+Host: https://nodebase.tech
+
+# Sitemaps
+Sitemap: https://nodebase.tech/sitemap.xml

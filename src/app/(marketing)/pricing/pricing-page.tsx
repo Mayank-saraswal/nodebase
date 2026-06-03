@@ -4,6 +4,7 @@ import { PLAN_LIMITS } from "@/lib/plan-limits"
 import { CheckIcon, XIcon, ZapIcon, SparklesIcon, ArrowRightIcon } from "lucide-react"
 import Link from "next/link"
 import { useState } from "react"
+import { PRICE_CATALOG } from "@/config/pricing"
 
 /* ─── plan data ──────────────────────────────────────────── */
 
@@ -27,8 +28,8 @@ const plans: PlanCard[] = [
     key: "FREE",
     name: "Free",
     tagline: "For side projects & experiments",
-    monthlyPrice: 0,
-    yearlyPrice: 0,
+    monthlyPrice: PRICE_CATALOG.FREE.monthly,
+    yearlyPrice: PRICE_CATALOG.FREE.yearly,
     cta: "Get Started Free",
     ctaHref: "/signup",
     featured: false,
@@ -44,8 +45,8 @@ const plans: PlanCard[] = [
     key: "STARTER",
     name: "Starter",
     tagline: "For indie hackers & small biz",
-    monthlyPrice: 999,
-    yearlyPrice: 799,
+    monthlyPrice: PRICE_CATALOG.STARTER.monthly,
+    yearlyPrice: PRICE_CATALOG.STARTER.yearly,
     cta: "Start 14-day Trial",
     ctaHref: "/signup?plan=starter",
     featured: false,
@@ -63,8 +64,8 @@ const plans: PlanCard[] = [
     key: "PRO",
     name: "Pro",
     tagline: "For growing startups & D2C brands",
-    monthlyPrice: 2999,
-    yearlyPrice: 2499,
+    monthlyPrice: PRICE_CATALOG.PRO.monthly,
+    yearlyPrice: PRICE_CATALOG.PRO.yearly,
     cta: "Start 14-day Trial",
     ctaHref: "/signup?plan=pro",
     featured: true,
@@ -83,8 +84,8 @@ const plans: PlanCard[] = [
     key: "TEAM",
     name: "Team",
     tagline: "For teams & agencies",
-    monthlyPrice: 7999,
-    yearlyPrice: 6499,
+    monthlyPrice: PRICE_CATALOG.TEAM.monthly,
+    yearlyPrice: PRICE_CATALOG.TEAM.yearly,
     cta: "Contact Sales",
     ctaHref: "/signup?plan=team",
     featured: false,

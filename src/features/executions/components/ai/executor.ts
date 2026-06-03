@@ -172,7 +172,7 @@ export const aiExecutor: NodeExecutor<AiNodeData> = async ({
               ...mediaOpts,
               filename: `generated-image-${i}.png`,
             })
-            return result.url
+            return result.publicUrl
           } catch (err) {
             // Log but don't crash — return original URL as fallback
             console.error(`MediaService: Failed to upload image ${i}:`, err)

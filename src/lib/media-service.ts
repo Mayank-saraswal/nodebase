@@ -42,10 +42,9 @@ function getS3Client(): S3Client {
 
 export interface UploadResult {
   blobName: string // internal path (kept for backward compat)
-  url: string // presigned URL valid for SAS_EXPIRY_HOURS
+  publicUrl: string // durable public URL
   mimeType: string
   sizeBytes: number
-  expiresAt: string // ISO timestamp
 }
 
 export interface MediaUploadOptions {
@@ -136,17 +135,15 @@ export async function uploadFromBuffer(
     })
   )
 
-  const url = await generatePresignedUrl(objectKey)
-  const expiresAt = new Date(
-    Date.now() + SAS_EXPIRY_HOURS * 60 * 60 * 1000
-  ).toISOString()
+  const publicUrl = SPACES_CDN_URL 
+    ? `${SPACES_CDN_URL}/${objectKey}` 
+    : `https://${SPACES_BUCKET}.${SPACES_ENDPOINT.replace("https://", "")}/${objectKey}`
 
   return {
     blobName: objectKey,
-    url,
+    publicUrl,
     mimeType,
     sizeBytes: buffer.length,
-    expiresAt,
   }
 }
 
@@ -239,16 +236,23 @@ export async function deleteWorkflowMedia(
 
     const objects = listResult.Contents
     if (objects && objects.length > 0) {
-      await client.send(
+      const response = await client.send(
         new DeleteObjectsCommand({
           Bucket: SPACES_BUCKET,
           Delete: {
             Objects: objects.map((obj) => ({ Key: obj.Key! })),
-            Quiet: true,
+            Quiet: false,
           },
         })
       )
-      deleted += objects.length
+      
+      if (response.Errors && response.Errors.length > 0) {
+        throw new Error(`MediaService: Failed to delete some objects: ${response.Errors.map((e) => e.Key).join(", ")}`)
+      }
+
+      if (response.Deleted) {
+        deleted += response.Deleted.length
+      }
     }
 
     continuationToken = listResult.NextContinuationToken

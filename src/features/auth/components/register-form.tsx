@@ -90,7 +90,8 @@ export function RegisterForm() {
             });
             const data = await res.json();
             if (res.ok && data.success) {
-                router.push(`/check-email?email=${encodeURIComponent(values.email)}`);
+                sessionStorage.setItem("pendingEmail", values.email);
+                router.push(`/check-email`);
             } else {
                 toast.error(data.error || "Failed to create account");
             }

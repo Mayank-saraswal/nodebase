@@ -31,7 +31,7 @@ export function SoftwareAppStructuredData() {
       "Schedule-based triggers",
       "Webhook triggers",
     ],
-    "screenshot": "https://nodebase.tech/og-image.png",
+    "screenshot": "https://nodebase.tech/opengraph-image",
     "inLanguage": "en-IN",
     "audience": {
       "@type": "Audience",

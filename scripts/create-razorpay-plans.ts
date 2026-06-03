@@ -1,4 +1,5 @@
 import Razorpay from "razorpay"
+import { PRICE_CATALOG } from "../src/config/pricing"
 
 async function createPlans() {
   if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
@@ -21,7 +22,7 @@ async function createPlans() {
       interval: 1,
       item: {
         name: "Nodebase Starter",
-        amount: 99900, // ₹999 in paise
+        amount: PRICE_CATALOG.STARTER.monthly * 100, // in paise
         currency: "INR",
         description: "10,000 workflow runs/month, 50 workflows",
       },
@@ -31,7 +32,7 @@ async function createPlans() {
       interval: 1,
       item: {
         name: "Nodebase Pro",
-        amount: 249900, // ₹2,499 in paise
+        amount: PRICE_CATALOG.PRO.monthly * 100, // in paise
         currency: "INR",
         description: "100,000 workflow runs/month, unlimited workflows",
       },
@@ -41,7 +42,7 @@ async function createPlans() {
       interval: 1,
       item: {
         name: "Nodebase Team",
-        amount: 599900, // ₹5,999 in paise
+        amount: PRICE_CATALOG.TEAM.monthly * 100, // in paise
         currency: "INR",
         description: "500,000 workflow runs/month, team features",
       },
@@ -49,14 +50,25 @@ async function createPlans() {
   ]
 
   for (const plan of plans) {
-    const created = (await razorpay.plans.create(plan)) as unknown as { id: string }
     const tierName = plan.item.name.split(" ")[1].toUpperCase()
+    const envVarName = `RAZORPAY_PLAN_${tierName}_ID`
+    
+    if (process.env[envVarName]) {
+      console.log(`Plan '${plan.item.name}' already exists via env ${envVarName} → ID: ${process.env[envVarName]}`)
+      console.log("")
+      continue
+    }
+
+    const created = (await razorpay.plans.create(plan)) as unknown as { id: string }
     console.log(`Created plan: ${plan.item.name} → ID: ${created.id}`)
-    console.log(`Add to .env: RAZORPAY_PLAN_${tierName}_ID=${created.id}`)
+    console.log(`Add to .env: ${envVarName}=${created.id}`)
     console.log("")
   }
 
   console.log("Done! Copy the plan IDs above into your .env file.")
 }
 
-createPlans().catch(console.error)
+createPlans().catch((err) => {
+  console.error(err)
+  process.exit(1)
+})

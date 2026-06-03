@@ -201,7 +201,7 @@ export const whatsappExecutor: NodeExecutor<WhatsAppData> = async ({
                 executionId: (context.__executionId as string) ?? undefined,
               }
             )
-            finalMediaUrl = uploadResult.url
+            finalMediaUrl = uploadResult.publicUrl
           } catch (err) {
             console.error("WhatsApp: Failed to upload media to cloud storage:", err)
             // Fall back to original URL — may still work if not actually expired
@@ -240,7 +240,7 @@ export const whatsappExecutor: NodeExecutor<WhatsAppData> = async ({
                 executionId: (context.__executionId as string) ?? undefined,
               }
             )
-            finalDocUrl = uploadResult.url
+            finalDocUrl = uploadResult.publicUrl
           } catch (err) {
             console.error("WhatsApp: Failed to upload document to cloud storage:", err)
           }

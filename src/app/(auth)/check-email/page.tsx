@@ -1,13 +1,15 @@
 "use client"
 
-import { useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { Suspense } from "react"
+import { Suspense, useEffect, useState } from "react"
 import { MailCheck } from "lucide-react"
 
 function CheckEmailContent() {
-  const searchParams = useSearchParams()
-  const email = searchParams.get("email")
+  const [email, setEmail] = useState<string | null>(null)
+
+  useEffect(() => {
+    setEmail(sessionStorage.getItem("pendingEmail"))
+  }, [])
 
   return (
     <div className="min-h-screen bg-background flex flex-col justify-center py-12 sm:px-6 lg:px-8">
