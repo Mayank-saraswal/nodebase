@@ -16,14 +16,24 @@ export const githubTriggerExecutor: NodeExecutor<GitHubTriggerData> = async ({
     })
   );
 
-  const result = await step.run("github-trigger", async () => context);
+  try {
+    const result = await step.run("github-trigger", async () => context);
 
-  await publish(
-    githubChannel().status({
-      nodeId,
-      status: "success",
-    })
-  );
+    await publish(
+      githubChannel().status({
+        nodeId,
+        status: "success",
+      })
+    );
 
-  return result;
+    return result;
+  } catch (error) {
+    await publish(
+      githubChannel().status({
+        nodeId,
+        status: "error",
+      })
+    );
+    throw error;
+  }
 };

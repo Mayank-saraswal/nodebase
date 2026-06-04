@@ -11,7 +11,7 @@ model GitHubNode {
   workflow   workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
 
   credentialId String?
-  credential   Credential? @relation(fields: [credentialId], references: [id])
+  credential   Credential? @relation(fields: [credentialId], references: [id], onDelete: SetNull)
 
   operation GitHubOperation @default(USER_GET_CURRENT)
 
@@ -54,6 +54,9 @@ model GitHubNode {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
+
+  @@index([workflowId])
+  @@index([nodeId])
 }
 
 model GitHubTriggerNode {
@@ -68,8 +71,19 @@ model GitHubTriggerNode {
   events String @default("[\"push\"]") // JSON string array of GitHub webhook events
 
   webhookId String? // The ID of the webhook created in GitHub, to allow cleanup
-  webhookSecret String? // The secret used to verify the incoming payload
+
+  // DEPRECATED — plaintext, kept for backward-compat until data migration is complete.
+  // TODO: Once all rows have webhookSecretEncrypted set and webhookSecret IS NULL,
+  // create a follow-up migration to: DROP COLUMN webhookSecret and set
+  // webhookSecretEncrypted NOT NULL.
+  webhookSecret String? // legacy plaintext (pre-encryption rows)
+
+  // AES-256 encrypted webhook secret. Prefer this over webhookSecret.
+  // Populated by new saves and by `npm run migrate:github-secrets`.
+  webhookSecretEncrypted String? // encrypted; null until migrated
 
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
+
+  @@index([workflowId])
 }

@@ -1,6 +1,7 @@
 import { sendWorkflowExecution } from "@/inngest/utils";
 import prisma from "@/lib/db";
 import { claimIdempotencyKey } from "@/lib/redis";
+import { decrypt } from "@/lib/encryption";
 import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -24,8 +25,13 @@ export async function POST(
   { params }: { params: Promise<{ webhookId: string }> }
 ) {
   try {
-    const contentLength = request.headers.get("content-length");
-    if (contentLength && parseInt(contentLength) > 10_000_000) {
+    // Validate content-length: treat missing/invalid/negative as zero
+    const contentLengthRaw = request.headers.get("content-length");
+    const contentLength = contentLengthRaw !== null ? Number(contentLengthRaw) : 0;
+    if (!Number.isFinite(contentLength) || contentLength < 0) {
+      return NextResponse.json({ error: "Invalid content-length header" }, { status: 400 });
+    }
+    if (contentLength > 10_000_000) {
       return NextResponse.json({ error: "Payload too large" }, { status: 413 });
     }
 
@@ -52,10 +58,23 @@ export async function POST(
     const rawTextBody = await request.text().catch(() => "");
     const signature = request.headers.get("x-hub-signature-256") || "";
 
+    // Resolve the webhook secret: prefer encrypted, fall back to legacy plaintext
+    let webhookSecret: string | null = null;
+    if (webhookTrigger.webhookSecretEncrypted) {
+      try {
+        webhookSecret = decrypt(webhookTrigger.webhookSecretEncrypted);
+      } catch {
+        // If decryption fails, fall back to plaintext
+        webhookSecret = webhookTrigger.webhookSecret;
+      }
+    } else {
+      webhookSecret = webhookTrigger.webhookSecret;
+    }
+
     // Verify signature if a secret is configured
-    if (webhookTrigger.webhookSecret) {
+    if (webhookSecret) {
       const isValid = verifyGitHubSignature(
-        webhookTrigger.webhookSecret,
+        webhookSecret,
         rawTextBody,
         signature
       );
@@ -76,8 +95,23 @@ export async function POST(
       // Keep empty
     }
 
-    const githubEvent = request.headers.get("x-github-event") || "unknown";
-    const githubDelivery = request.headers.get("x-github-delivery") || "";
+    // Validate required GitHub headers
+    const githubEvent = request.headers.get("x-github-event");
+    const githubDelivery = request.headers.get("x-github-delivery");
+
+    if (!githubEvent) {
+      return NextResponse.json(
+        { success: false, error: "Missing required header: x-github-event" },
+        { status: 400 }
+      );
+    }
+
+    if (!githubDelivery) {
+      return NextResponse.json(
+        { success: false, error: "Missing required header: x-github-delivery" },
+        { status: 400 }
+      );
+    }
 
     // GitHub's delivery ID acts as a natural idempotency key
     const idempotencyKey = `github-webhook:${webhookId}:${githubDelivery}`;

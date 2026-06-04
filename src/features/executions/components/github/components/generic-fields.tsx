@@ -1,3 +1,6 @@
+"use client"
+
+import { useEffect, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -19,6 +22,19 @@ export function GenericFields({ values, setValues }: GenericFieldsProps) {
     op.startsWith("PACKAGE_") || op.startsWith("ATTESTATION_") ||
     op.startsWith("PROJECT_V2_") || op.startsWith("ADVISORY_")
   const needsOrgOnly = op.startsWith("COPILOT_") || isOrg
+
+  // Local string state for the JSON Textarea — preserves partial edits
+  const [optionsText, setOptionsText] = useState(
+    typeof values.options === "object" ? JSON.stringify(values.options, null, 2) : "{}"
+  )
+
+  // Sync optionsText when values.options changes externally (e.g., from DB load)
+  useEffect(() => {
+    const externalJson = typeof values.options === "object"
+      ? JSON.stringify(values.options, null, 2)
+      : "{}"
+    setOptionsText(externalJson)
+  }, [values.options])
 
   return (
     <div className="space-y-4">
@@ -115,12 +131,13 @@ export function GenericFields({ values, setValues }: GenericFieldsProps) {
         <Label>Advanced Options (JSON)</Label>
         <Textarea
           placeholder='{"key": "value"}'
-          value={typeof values.options === "object" ? JSON.stringify(values.options, null, 2) : "{}"}
+          value={optionsText}
           onChange={(e) => {
+            setOptionsText(e.target.value)
             try {
               setValues({ ...values, options: JSON.parse(e.target.value) })
             } catch {
-              // Allow invalid JSON while typing
+              // Allow invalid JSON while typing — local state preserves edits
             }
           }}
           className="font-mono text-xs min-h-[80px]"

@@ -3,6 +3,10 @@ import { GitHubClient } from "../api-client";
 import { GitHubConfig } from "../types";
 import { resolveTemplate } from "@/features/executions/lib/template-resolver";
 import { NonRetriableError } from "inngest";
+/** Safely cast an options value to string (empty string if null/undefined/object). */
+const opt = (v: unknown): string => (v != null && typeof v !== "object" ? String(v) : "");
+
+
 
 /**
  * Handles all Workflow, Agent Task, Artifact, and Deployment operations.
@@ -26,9 +30,16 @@ export async function executeWorkflowOperations(
 
     case GitHubOperation.WORKFLOW_DISPATCH: {
       const ref = resolveTemplate(config.branch || "main", context);
-      const inputs = config.clientPayload
-        ? JSON.parse(resolveTemplate(config.clientPayload, context))
-        : {};
+      let inputs = {};
+      if (config.clientPayload) {
+        try {
+          inputs = JSON.parse(resolveTemplate(config.clientPayload, context));
+        } catch (error) {
+          throw new NonRetriableError(
+            `Invalid JSON in workflow dispatch inputs (clientPayload): ${error instanceof Error ? error.message : String(error)}`
+          );
+        }
+      }
       await client.request(
         `/repos/${owner}/${repo}/actions/workflows/${workflowId}/dispatches`,
         { method: "POST", body: { ref, inputs } }
@@ -191,7 +202,7 @@ export async function executeWorkflowOperations(
     // ── Artifact Operations (6) ────────────────────────────────────
     case GitHubOperation.ARTIFACT_LIST: {
       let endpoint = `/repos/${owner}/${repo}/actions/artifacts?per_page=${config.perPage || 30}`;
-      if (config.options?.name) endpoint += `&name=${encodeURIComponent(config.options.name)}`;
+      if (config.options?.name) endpoint += `&name=${encodeURIComponent(opt(config.options.name))}`;
       const data = await client.request(endpoint);
       return {
         artifacts: data.artifacts?.map((a: any) => ({

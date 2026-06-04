@@ -54,10 +54,19 @@ export const githubExecutor: NodeExecutor<GitHubNodeData> = async ({
     );
   }
 
-  const creds = JSON.parse(decrypt(credential.value)) as {
-    accessToken: string;
-    baseUrl?: string;
-  };
+  let creds: { accessToken: string; baseUrl?: string };
+  try {
+    creds = JSON.parse(decrypt(credential.value)) as {
+      accessToken: string;
+      baseUrl?: string;
+    };
+  } catch (parseError) {
+    await publish(githubChannel().status({ nodeId, status: "error" }));
+    throw new NonRetriableError(
+      `Invalid GitHub credential: failed to parse decrypted value for credential ${credential.id}. ` +
+      `Error: ${parseError instanceof Error ? parseError.message : String(parseError)}`
+    );
+  }
 
   const client = new GitHubClient({
     accessToken: creds.accessToken,
@@ -82,14 +91,14 @@ export const githubExecutor: NodeExecutor<GitHubNodeData> = async ({
         operation.startsWith("RELEASE_") || 
         operation.startsWith("GIST_")
       ) {
-        return executeRepositoryOperations(client, config, { owner, repo, context });
+        return executeRepositoryOperations(client, config as unknown as GitHubConfig, { owner, repo, context });
       } 
       else if (
         operation.startsWith("ISSUE_") || 
         operation.startsWith("PULL_REQUEST_") || 
         operation.startsWith("DISCUSSION_")
       ) {
-        return executeIssuesPrsOperations(client, config, { owner, repo, context });
+        return executeIssuesPrsOperations(client, config as unknown as GitHubConfig, { owner, repo, context });
       }
       else if (
         operation.startsWith("WORKFLOW_") || 
@@ -97,7 +106,7 @@ export const githubExecutor: NodeExecutor<GitHubNodeData> = async ({
         operation.startsWith("ARTIFACT_") || 
         operation.startsWith("DEPLOYMENT_")
       ) {
-        return executeWorkflowOperations(client, config, { owner, repo, context });
+        return executeWorkflowOperations(client, config as unknown as GitHubConfig, { owner, repo, context });
       }
       else if (
         operation.startsWith("USER_") || 
@@ -106,11 +115,11 @@ export const githubExecutor: NodeExecutor<GitHubNodeData> = async ({
         operation.startsWith("SECRET_") || 
         operation.startsWith("ENVIRONMENT_")
       ) {
-        return executeUserOrgOperations(client, config, { owner, repo, context });
+        return executeUserOrgOperations(client, config as unknown as GitHubConfig, { owner, repo, context });
       }
       else {
         // Fallback for search, copilot, codespaces, rulesets, projects v2, security, attestations
-        return executeSearchMiscOperations(client, config, { owner, repo, context });
+        return executeSearchMiscOperations(client, config as unknown as GitHubConfig, { owner, repo, context });
       }
     });
   } catch (error) {
@@ -119,5 +128,6 @@ export const githubExecutor: NodeExecutor<GitHubNodeData> = async ({
   }
 
   await publish(githubChannel().status({ nodeId, status: "success" }));
-  return result;
+  // Merge context with result so downstream nodes see accumulated data
+  return { ...context, github: result };
 };

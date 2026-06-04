@@ -30,5 +30,5 @@ export interface GitHubConfig {
   releaseName?: string;
   draft?: boolean;
   prerelease?: boolean;
-  options?: any;
+  options?: Record<string, unknown>;
 }

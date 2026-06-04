@@ -3,6 +3,10 @@ import { GitHubClient } from "../api-client";
 import { GitHubConfig } from "../types";
 import { resolveTemplate } from "@/features/executions/lib/template-resolver";
 import { NonRetriableError } from "inngest";
+/** Safely cast an options value to string (empty string if null/undefined/object). */
+const opt = (v: unknown): string => (v != null && typeof v !== "object" ? String(v) : "");
+
+
 
 /**
  * Handles Search, Codespaces, Copilot, Rulesets, Projects V2, Attestations, and Security Advisories.
@@ -98,7 +102,7 @@ export async function executeSearchMiscOperations(
       return client.request("/user/codespaces");
 
     case GitHubOperation.CODESPACES_GET: {
-      const name = resolveTemplate(config.options?.codespaceName || "", context);
+      const name = resolveTemplate(opt(config.options?.codespaceName) || "", context);
       return client.request(`/user/codespaces/${name}`);
     }
 
@@ -117,23 +121,23 @@ export async function executeSearchMiscOperations(
     }
 
     case GitHubOperation.CODESPACES_START: {
-      const name = resolveTemplate(config.options?.codespaceName || "", context);
+      const name = resolveTemplate(opt(config.options?.codespaceName) || "", context);
       return client.request(`/user/codespaces/${name}/start`, { method: "POST" });
     }
 
     case GitHubOperation.CODESPACES_STOP: {
-      const name = resolveTemplate(config.options?.codespaceName || "", context);
+      const name = resolveTemplate(opt(config.options?.codespaceName) || "", context);
       return client.request(`/user/codespaces/${name}/stop`, { method: "POST" });
     }
 
     case GitHubOperation.CODESPACES_DELETE: {
-      const name = resolveTemplate(config.options?.codespaceName || "", context);
+      const name = resolveTemplate(opt(config.options?.codespaceName) || "", context);
       await client.request(`/user/codespaces/${name}`, { method: "DELETE" });
       return { success: true };
     }
 
     case GitHubOperation.CODESPACES_UPDATE: {
-      const name = resolveTemplate(config.options?.codespaceName || "", context);
+      const name = resolveTemplate(opt(config.options?.codespaceName) || "", context);
       const body: Record<string, unknown> = {};
       if (config.options?.machine) body.machine = config.options.machine;
       if (config.options?.displayName) body.display_name = config.options.displayName;
@@ -141,7 +145,7 @@ export async function executeSearchMiscOperations(
     }
 
     case GitHubOperation.CODESPACES_EXPORT: {
-      const name = resolveTemplate(config.options?.codespaceName || "", context);
+      const name = resolveTemplate(opt(config.options?.codespaceName) || "", context);
       return client.request(`/user/codespaces/${name}/exports`, { method: "POST" });
     }
 
@@ -155,7 +159,7 @@ export async function executeSearchMiscOperations(
       return client.request("/user/codespaces/secrets");
 
     case GitHubOperation.CODESPACES_CREATE_SECRET: {
-      const secretName = resolveTemplate(config.options?.secretName || "", context);
+      const secretName = resolveTemplate(opt(config.options?.secretName) || "", context);
       return client.request(`/user/codespaces/secrets/${secretName}`, {
         method: "PUT",
         body: {
@@ -233,7 +237,7 @@ export async function executeSearchMiscOperations(
     case GitHubOperation.COPILOT_ADD_SPACE_RESOURCE: {
       const spaceId = config.options?.spaceId;
       return client.request(`/orgs/${owner}/copilot/spaces/${spaceId}/resources`, {
-        method: "POST", body: config.options?.resource || {},
+        method: "POST", body: (config.options?.resource as Record<string, unknown>) || {},
       });
     }
 

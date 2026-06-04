@@ -8,7 +8,7 @@ model ZohoCrmNode {
   nodeId       String      @unique
   workflowId   String
   credentialId String?
-  credential   Credential? @relation(fields: [credentialId], references: [id])
+  credential   Credential? @relation(fields: [credentialId], references: [id], onDelete: SetNull)
 
   operation    ZohoCrmOperation @default(CREATE_LEAD)
   variableName String           @default("zoho")
@@ -116,7 +116,7 @@ model HubspotNode {
   nodeId       String      @unique
   workflowId   String
   credentialId String?
-  credential   Credential? @relation(fields: [credentialId], references: [id])
+  credential   Credential? @relation(fields: [credentialId], references: [id], onDelete: SetNull)
 
   operation    HubspotOperation @default(CREATE_CONTACT)
   variableName String           @default("hubspot")
@@ -221,7 +221,7 @@ model FreshdeskNode {
   nodeId       String      @unique
   workflowId   String
   credentialId String?
-  credential   Credential? @relation(fields: [credentialId], references: [id])
+  credential   Credential? @relation(fields: [credentialId], references: [id], onDelete: SetNull)
 
   operation    FreshdeskOperation @default(CREATE_TICKET)
   variableName String             @default("freshdesk")

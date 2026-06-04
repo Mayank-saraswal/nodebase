@@ -3,6 +3,23 @@ import { GitHubClient } from "../api-client";
 import { GitHubConfig } from "../types";
 import { resolveTemplate } from "@/features/executions/lib/template-resolver";
 import { NonRetriableError } from "inngest";
+/** Safely cast an options value to string (empty string if null/undefined/object). */
+const opt = (v: unknown): string => (v != null && typeof v !== "object" ? String(v) : "");
+
+
+
+/**
+ * Safely parse a JSON string, throwing a NonRetriableError with context on failure.
+ */
+function safeParseJson<T = unknown>(value: string, fieldName: string): T {
+  try {
+    return JSON.parse(value);
+  } catch (error) {
+    throw new NonRetriableError(
+      `Invalid JSON in ${fieldName}: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
 
 /**
  * Handles all Issue, Pull Request, and Discussion operations.
@@ -24,9 +41,13 @@ export async function executeIssuesPrsOperations(
         title: resolveTemplate(config.title || "", context),
         body: resolveTemplate(config.body || "", context),
       };
-      if (config.labels) body.labels = JSON.parse(config.labels);
-      if (config.assignees) body.assignees = JSON.parse(config.assignees);
-      if (config.options?.milestone) body.milestone = parseInt(config.options.milestone);
+      if (config.labels) body.labels = safeParseJson(config.labels, 'labels');
+      if (config.assignees) body.assignees = safeParseJson(config.assignees, 'assignees');
+      if (config.options?.milestone) {
+        const ms = Number.parseInt(String(config.options.milestone), 10);
+        if (!Number.isFinite(ms)) throw new NonRetriableError(`Invalid milestone value: ${config.options.milestone}`);
+        body.milestone = ms;
+      }
       const data = await client.request(`/repos/${owner}/${repo}/issues`, { method: "POST", body });
       return {
         issueId: data.id, issueNumber: data.number,
@@ -56,9 +77,13 @@ export async function executeIssuesPrsOperations(
       if (config.body) body.body = resolveTemplate(config.body, context);
       if (config.state) body.state = config.state;
       if (config.options?.stateReason) body.state_reason = config.options.stateReason;
-      if (config.labels) body.labels = JSON.parse(config.labels);
-      if (config.assignees) body.assignees = JSON.parse(config.assignees);
-      if (config.options?.milestone) body.milestone = parseInt(config.options.milestone);
+      if (config.labels) body.labels = safeParseJson(config.labels, 'labels');
+      if (config.assignees) body.assignees = safeParseJson(config.assignees, 'assignees');
+      if (config.options?.milestone) {
+        const ms = Number.parseInt(String(config.options.milestone), 10);
+        if (!Number.isFinite(ms)) throw new NonRetriableError(`Invalid milestone value: ${config.options.milestone}`);
+        body.milestone = ms;
+      }
       const data = await client.request(
         `/repos/${owner}/${repo}/issues/${issueNumber}`,
         { method: "PATCH", body }
@@ -107,7 +132,7 @@ export async function executeIssuesPrsOperations(
     }
 
     case GitHubOperation.ISSUE_ADD_LABELS: {
-      const labels = config.labels ? JSON.parse(config.labels) : [];
+      const labels = config.labels ? safeParseJson<string[]>(config.labels, 'labels') : [];
       const data = await client.request(
         `/repos/${owner}/${repo}/issues/${issueNumber}/labels`,
         { method: "POST", body: { labels } }
@@ -116,7 +141,7 @@ export async function executeIssuesPrsOperations(
     }
 
     case GitHubOperation.ISSUE_REMOVE_LABEL: {
-      const label = resolveTemplate(config.options?.labelName || "", context);
+      const label = resolveTemplate(opt(config.options?.labelName) || "", context);
       await client.request(
         `/repos/${owner}/${repo}/issues/${issueNumber}/labels/${encodeURIComponent(label)}`,
         { method: "DELETE" }
@@ -138,7 +163,7 @@ export async function executeIssuesPrsOperations(
       );
 
     case GitHubOperation.ISSUE_UPDATE_COMMENT: {
-      const commentId = config.options?.commentId;
+      const commentId = opt(config.options?.commentId);
       const data = await client.request(
         `/repos/${owner}/${repo}/issues/comments/${commentId}`,
         { method: "PATCH", body: { body: resolveTemplate(config.body || "", context) } }
@@ -147,7 +172,7 @@ export async function executeIssuesPrsOperations(
     }
 
     case GitHubOperation.ISSUE_DELETE_COMMENT: {
-      const commentId = config.options?.commentId;
+      const commentId = opt(config.options?.commentId);
       await client.request(
         `/repos/${owner}/${repo}/issues/comments/${commentId}`,
         { method: "DELETE" }
@@ -156,7 +181,7 @@ export async function executeIssuesPrsOperations(
     }
 
     case GitHubOperation.ISSUE_ASSIGN: {
-      const assignees = config.assignees ? JSON.parse(config.assignees) : [];
+      const assignees = config.assignees ? safeParseJson<string[]>(config.assignees, 'assignees') : [];
       return client.request(
         `/repos/${owner}/${repo}/issues/${issueNumber}/assignees`,
         { method: "POST", body: { assignees } }
@@ -164,7 +189,7 @@ export async function executeIssuesPrsOperations(
     }
 
     case GitHubOperation.ISSUE_UNASSIGN: {
-      const assignees = config.assignees ? JSON.parse(config.assignees) : [];
+      const assignees = config.assignees ? safeParseJson<string[]>(config.assignees, 'assignees') : [];
       return client.request(
         `/repos/${owner}/${repo}/issues/${issueNumber}/assignees`,
         { method: "DELETE", body: { assignees } }

@@ -3,6 +3,10 @@ import { GitHubClient } from "../api-client";
 import { GitHubConfig } from "../types";
 import { resolveTemplate } from "@/features/executions/lib/template-resolver";
 import { NonRetriableError } from "inngest";
+/** Safely cast an options value to string (empty string if null/undefined/object). */
+const opt = (v: unknown): string => (v != null && typeof v !== "object" ? String(v) : "");
+
+
 
 /**
  * Handles all Repository, File, Branch, Release, and Gist operations.
@@ -124,7 +128,7 @@ export async function executeRepositoryOperations(
 
     case GitHubOperation.REPOSITORY_TRANSFER: {
       const body: Record<string, unknown> = {
-        new_owner: resolveTemplate(config.options?.newOwner || "", context),
+        new_owner: resolveTemplate(opt(config.options?.newOwner) || "", context),
       };
       if (config.options?.newName) body.new_name = config.options.newName;
       return client.request(`/repos/${owner}/${repo}/transfer`, { method: "POST", body });
@@ -132,9 +136,16 @@ export async function executeRepositoryOperations(
 
     case GitHubOperation.REPOSITORY_DISPATCH: {
       const event_type = resolveTemplate(config.eventType || "", context);
-      const client_payload = config.clientPayload
-        ? JSON.parse(resolveTemplate(config.clientPayload, context))
-        : {};
+      let client_payload = {};
+      if (config.clientPayload) {
+        try {
+          client_payload = JSON.parse(resolveTemplate(config.clientPayload, context));
+        } catch (error) {
+          throw new NonRetriableError(
+            `Invalid JSON in clientPayload for REPOSITORY_DISPATCH: ${error instanceof Error ? error.message : String(error)}`
+          );
+        }
+      }
       await client.request(`/repos/${owner}/${repo}/dispatches`, {
         method: "POST",
         body: { event_type, client_payload },
@@ -143,7 +154,7 @@ export async function executeRepositoryOperations(
     }
 
     case GitHubOperation.REPOSITORY_CHECK_COLLABORATOR: {
-      const username = resolveTemplate(config.options?.username || "", context);
+      const username = resolveTemplate(opt(config.options?.username) || "", context);
       try {
         await client.request(`/repos/${owner}/${repo}/collaborators/${username}`);
         return { isCollaborator: true, username };
@@ -177,7 +188,7 @@ export async function executeRepositoryOperations(
       const message = resolveTemplate(config.commitMessage || "", context);
       const body: Record<string, unknown> = { message, content };
       if (config.branch) body.branch = config.branch;
-      if (config.options?.sha) body.sha = config.options.sha;
+      if (opt(config.options?.sha)) body.sha = opt(config.options?.sha);
 
       if (config.operation === GitHubOperation.FILE_CREATE_OR_UPDATE && !body.sha) {
         try {
@@ -204,7 +215,7 @@ export async function executeRepositoryOperations(
     case GitHubOperation.FILE_DELETE: {
       const body: Record<string, unknown> = {
         message: resolveTemplate(config.commitMessage || "", context),
-        sha: config.options?.sha,
+        sha: opt(config.options?.sha),
       };
       if (config.branch) body.branch = config.branch;
       await client.request(
@@ -236,7 +247,7 @@ export async function executeRepositoryOperations(
       return client.request(`/repos/${owner}/${repo}/branches/${config.branch}`);
 
     case GitHubOperation.BRANCH_CREATE: {
-      const sha = resolveTemplate(config.options?.sha || "", context);
+      const sha = resolveTemplate(opt(config.options?.sha) || "", context);
       return client.request(`/repos/${owner}/${repo}/git/refs`, {
         method: "POST",
         body: { ref: `refs/heads/${config.branch}`, sha },
@@ -322,9 +333,18 @@ export async function executeRepositoryOperations(
 
     // ── Gist Operations (6) ────────────────────────────────────────
     case GitHubOperation.GIST_CREATE: {
-      const files = config.options?.files
-        ? (typeof config.options.files === "string" ? JSON.parse(config.options.files) : config.options.files)
-        : {};
+      let files = {};
+      if (config.options?.files) {
+        try {
+          files = typeof config.options.files === "string"
+            ? JSON.parse(config.options.files)
+            : config.options.files;
+        } catch (error) {
+          throw new NonRetriableError(
+            `Invalid JSON in options.files for GIST_CREATE: ${error instanceof Error ? error.message : String(error)}`
+          );
+        }
+      }
       return client.request("/gists", {
         method: "POST",
         body: {
@@ -339,7 +359,7 @@ export async function executeRepositoryOperations(
       return client.request(`/gists/${config.options?.gistId}`);
 
     case GitHubOperation.GIST_LIST: {
-      const username = config.options?.username;
+      const username = opt(config.options?.username);
       const endpoint = username ? `/users/${username}/gists` : "/gists";
       return client.request(`${endpoint}?per_page=${config.perPage || 30}`);
     }

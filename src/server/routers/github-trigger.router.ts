@@ -3,6 +3,7 @@ import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import prisma from "@/lib/db";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
+import { encryptWebhookSecret } from "@/lib/webhook-secret";
 
 const upsertTriggerInput = z.object({
   nodeId: z.string(),
@@ -50,6 +51,8 @@ export const githubTriggerRouter = createTRPCRouter({
       repo: input.repo,
       events: input.events,
       webhookId,
+      // Store encrypted secret for new saves; keep legacy plaintext for backward compat
+      webhookSecretEncrypted: encryptWebhookSecret(webhookSecret),
       webhookSecret,
     };
 

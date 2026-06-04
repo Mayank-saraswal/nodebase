@@ -11,6 +11,12 @@ interface RequestOptions {
   headers?: Record<string, string>;
 }
 
+interface RequestWithHeadersResult<T> {
+  data: T;
+  headers: Headers;
+  status: number;
+}
+
 export class GitHubClient {
   private baseUrl: string;
   private headers: Record<string, string>;
@@ -28,6 +34,18 @@ export class GitHubClient {
     endpoint: string,
     options: RequestOptions = {}
   ): Promise<T> {
+    const { data } = await this.requestWithHeaders<T>(endpoint, options);
+    return data;
+  }
+
+  /**
+   * Internal helper that returns both parsed data and response headers.
+   * Enforces rate-limit checking, error handling, 204/non-JSON responses.
+   */
+  private async requestWithHeaders<T = any>(
+    endpoint: string,
+    options: RequestOptions = {}
+  ): Promise<RequestWithHeadersResult<T>> {
     const url = `${this.baseUrl}${endpoint}`;
     const response = await fetch(url, {
       method: options.method || "GET",
@@ -38,8 +56,11 @@ export class GitHubClient {
     // Handle rate limiting
     if (response.status === 403 || response.status === 429) {
       const remaining = response.headers.get("x-ratelimit-remaining");
-      if (remaining === "0") {
-        const resetTime = response.headers.get("x-ratelimit-reset");
+      if (remaining === "0" || remaining === null) {
+        const resetRaw = response.headers.get("x-ratelimit-reset");
+        const resetTime = resetRaw && Number.isFinite(Number(resetRaw))
+          ? new Date(Number(resetRaw) * 1000).toISOString()
+          : "unknown";
         throw new NonRetriableError(
           `GitHub API rate limit exceeded. Resets at ${resetTime}`
         );
@@ -55,16 +76,18 @@ export class GitHubClient {
 
     // Handle 204 No Content
     if (response.status === 204) {
-      return {} as T;
+      return { data: {} as T, headers: response.headers, status: response.status };
     }
     
     // For raw contents (like file downloads)
     const contentType = response.headers.get("content-type");
     if (contentType && !contentType.includes("application/json")) {
-        return response.text() as any;
+      const text = await response.text();
+      return { data: text as any, headers: response.headers, status: response.status };
     }
 
-    return response.json();
+    const data = await response.json();
+    return { data, headers: response.headers, status: response.status };
   }
 
   private getErrorMessage(status: number, error: any): string {
@@ -81,7 +104,7 @@ export class GitHubClient {
     return hints[message] || `GitHub API error (${status}): ${message}`;
   }
 
-  // Pagination helper
+  // Pagination helper — delegates to requestWithHeaders for consistent error/rate-limit handling
   async *paginate<T = any>(
     endpoint: string,
     perPage: number = 30
@@ -90,17 +113,14 @@ export class GitHubClient {
     while (true) {
       const separator = endpoint.includes("?") ? "&" : "?";
       const url = `${endpoint}${separator}per_page=${perPage}&page=${page}`;
-      const response = await fetch(`${this.baseUrl}${url}`, {
-        headers: this.headers,
-      });
+      const { data, headers } = await this.requestWithHeaders<T[]>(url);
       
-      const data = await response.json();
       if (!Array.isArray(data) || data.length === 0) break;
       
       yield data;
       
       // Check Link header for next page
-      const linkHeader = response.headers.get("link");
+      const linkHeader = headers.get("link");
       if (!linkHeader?.includes('rel="next"')) break;
       
       page++;

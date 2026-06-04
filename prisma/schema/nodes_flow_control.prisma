@@ -38,6 +38,7 @@ model SwitchNode {
   workflow     workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
 
   @@index([nodeId])
+  @@index([workflowId])
 }
 
 model SetVariableNode {

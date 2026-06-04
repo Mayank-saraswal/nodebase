@@ -4,6 +4,9 @@ import { GitHubConfig } from "../types";
 import { resolveTemplate } from "@/features/executions/lib/template-resolver";
 import { NonRetriableError } from "inngest";
 
+/** Safely cast an options value to string (empty string if null/undefined/object). */
+const opt = (v: unknown): string => (v != null && typeof v !== "object" ? String(v) : "");
+
 /**
  * Handles User, Org, Secret, Environment, and Package operations.
  * Maps to spec sections: 10 (User - 5), 11 (Org - 8), 16 (Environment - 10), 17 (Secrets - 12), 19 (Packages - 10)
@@ -30,7 +33,7 @@ export async function executeUserOrgOperations(
     }
 
     case GitHubOperation.USER_GET: {
-      const username = resolveTemplate(config.options?.username || owner || "", context);
+      const username = resolveTemplate(opt(config.options?.username) || opt(owner) || "", context);
       const data = await client.request(`/users/${username}`);
       return {
         userId: data.id, login: data.login, name: data.name,
@@ -45,21 +48,21 @@ export async function executeUserOrgOperations(
     }
 
     case GitHubOperation.USER_LIST_REPOS: {
-      const username = resolveTemplate(config.options?.username || owner || "", context);
+      const username = resolveTemplate(opt(config.options?.username) || opt(owner) || "", context);
       let endpoint = `/users/${username}/repos?per_page=${config.perPage || 30}`;
-      if (config.options?.type) endpoint += `&type=${config.options.type}`;
-      if (config.options?.sort) endpoint += `&sort=${config.options.sort}`;
-      if (config.options?.direction) endpoint += `&direction=${config.options.direction}`;
+      if (config.options?.type) endpoint += `&type=${opt(config.options.type)}`;
+      if (config.options?.sort) endpoint += `&sort=${opt(config.options.sort)}`;
+      if (config.options?.direction) endpoint += `&direction=${opt(config.options.direction)}`;
       return client.request(endpoint);
     }
 
     case GitHubOperation.USER_LIST_FOLLOWERS: {
-      const username = resolveTemplate(config.options?.username || owner || "", context);
+      const username = resolveTemplate(opt(config.options?.username) || opt(owner) || "", context);
       return client.request(`/users/${username}/followers?per_page=${config.perPage || 30}`);
     }
 
     case GitHubOperation.USER_LIST_FOLLOWING: {
-      const username = resolveTemplate(config.options?.username || owner || "", context);
+      const username = resolveTemplate(opt(config.options?.username) || opt(owner) || "", context);
       return client.request(`/users/${username}/following?per_page=${config.perPage || 30}`);
     }
 
@@ -78,14 +81,14 @@ export async function executeUserOrgOperations(
 
     case GitHubOperation.ORG_LIST: {
       const username = config.options?.username;
-      const endpoint = username ? `/users/${username}/orgs` : "/user/orgs";
+      const endpoint = username ? `/users/${opt(username)}/orgs` : "/user/orgs";
       return client.request(`${endpoint}?per_page=${config.perPage || 30}`);
     }
 
     case GitHubOperation.ORG_LIST_MEMBERS: {
       let endpoint = `/orgs/${owner}/members?per_page=${config.perPage || 30}`;
-      if (config.options?.filter) endpoint += `&filter=${config.options.filter}`;
-      if (config.options?.role) endpoint += `&role=${config.options.role}`;
+      if (config.options?.filter) endpoint += `&filter=${opt(config.options.filter)}`;
+      if (config.options?.role) endpoint += `&role=${opt(config.options.role)}`;
       return client.request(endpoint);
     }
 
@@ -94,8 +97,8 @@ export async function executeUserOrgOperations(
 
     case GitHubOperation.ORG_LIST_REPOS: {
       let endpoint = `/orgs/${owner}/repos?per_page=${config.perPage || 30}`;
-      if (config.options?.type) endpoint += `&type=${config.options.type}`;
-      if (config.options?.sort) endpoint += `&sort=${config.options.sort}`;
+      if (config.options?.type) endpoint += `&type=${opt(config.options.type)}`;
+      if (config.options?.sort) endpoint += `&sort=${opt(config.options.sort)}`;
       return client.request(endpoint);
     }
 
@@ -110,14 +113,14 @@ export async function executeUserOrgOperations(
     }
 
     case GitHubOperation.ORG_INVITE_MEMBER: {
-      const username = resolveTemplate(config.options?.username || "", context);
+      const username = resolveTemplate(opt(config.options?.username) || "", context);
       const body: Record<string, unknown> = {};
-      if (config.options?.role) body.role = config.options.role;
+      if (config.options?.role) body.role = opt(config.options.role);
       return client.request(`/orgs/${owner}/memberships/${username}`, { method: "PUT", body });
     }
 
     case GitHubOperation.ORG_REMOVE_MEMBER: {
-      const username = resolveTemplate(config.options?.username || "", context);
+      const username = resolveTemplate(opt(config.options?.username) || "", context);
       await client.request(`/orgs/${owner}/members/${username}`, { method: "DELETE" });
       return { success: true, removedUser: username };
     }
@@ -127,12 +130,12 @@ export async function executeUserOrgOperations(
       return client.request(`/repos/${owner}/${repo}/actions/secrets?per_page=${config.perPage || 30}`);
 
     case GitHubOperation.SECRET_GET_REPO: {
-      const secretName = resolveTemplate(config.options?.secretName || "", context);
+      const secretName = resolveTemplate(opt(config.options?.secretName) || "", context);
       return client.request(`/repos/${owner}/${repo}/actions/secrets/${secretName}`);
     }
 
     case GitHubOperation.SECRET_CREATE_REPO: {
-      const secretName = resolveTemplate(config.options?.secretName || config.title || "", context);
+      const secretName = resolveTemplate(opt(config.options?.secretName) || opt(config.title) || "", context);
       if (!config.options?.encryptedValue || !config.options?.keyId) {
         throw new NonRetriableError(
           "Creating secrets requires encryptedValue and keyId. " +
@@ -146,7 +149,7 @@ export async function executeUserOrgOperations(
     }
 
     case GitHubOperation.SECRET_DELETE_REPO: {
-      const secretName = resolveTemplate(config.options?.secretName || "", context);
+      const secretName = resolveTemplate(opt(config.options?.secretName) || "", context);
       await client.request(`/repos/${owner}/${repo}/actions/secrets/${secretName}`, { method: "DELETE" });
       return { success: true };
     }
@@ -155,26 +158,26 @@ export async function executeUserOrgOperations(
       return client.request(`/orgs/${owner}/actions/secrets?per_page=${config.perPage || 30}`);
 
     case GitHubOperation.SECRET_GET_ORG: {
-      const secretName = resolveTemplate(config.options?.secretName || "", context);
+      const secretName = resolveTemplate(opt(config.options?.secretName) || "", context);
       return client.request(`/orgs/${owner}/actions/secrets/${secretName}`);
     }
 
     case GitHubOperation.SECRET_CREATE_ORG: {
-      const secretName = resolveTemplate(config.options?.secretName || "", context);
+      const secretName = resolveTemplate(opt(config.options?.secretName) || "", context);
       if (!config.options?.encryptedValue || !config.options?.keyId) {
         throw new NonRetriableError("Creating org secrets requires encryptedValue and keyId.");
       }
       const body: Record<string, unknown> = {
         encrypted_value: config.options.encryptedValue,
         key_id: config.options.keyId,
-        visibility: config.options?.visibility || "all",
+        visibility: opt(config.options?.visibility) || "all",
       };
       if (config.options?.selectedRepositoryIds) body.selected_repository_ids = config.options.selectedRepositoryIds;
       return client.request(`/orgs/${owner}/actions/secrets/${secretName}`, { method: "PUT", body });
     }
 
     case GitHubOperation.SECRET_DELETE_ORG: {
-      const secretName = resolveTemplate(config.options?.secretName || "", context);
+      const secretName = resolveTemplate(opt(config.options?.secretName) || "", context);
       await client.request(`/orgs/${owner}/actions/secrets/${secretName}`, { method: "DELETE" });
       return { success: true };
     }
@@ -186,12 +189,12 @@ export async function executeUserOrgOperations(
       return client.request(`/orgs/${owner}/actions/secrets/public-key`);
 
     case GitHubOperation.SECRET_LIST_SELECTED_REPOS: {
-      const secretName = resolveTemplate(config.options?.secretName || "", context);
+      const secretName = resolveTemplate(opt(config.options?.secretName) || "", context);
       return client.request(`/orgs/${owner}/actions/secrets/${secretName}/repositories`);
     }
 
     case GitHubOperation.SECRET_SET_SELECTED_REPOS: {
-      const secretName = resolveTemplate(config.options?.secretName || "", context);
+      const secretName = resolveTemplate(opt(config.options?.secretName) || "", context);
       return client.request(`/orgs/${owner}/actions/secrets/${secretName}/repositories`, {
         method: "PUT",
         body: { selected_repository_ids: config.options?.selectedRepositoryIds || [] },
@@ -203,13 +206,13 @@ export async function executeUserOrgOperations(
       return client.request(`/repos/${owner}/${repo}/environments`);
 
     case GitHubOperation.ENVIRONMENT_GET: {
-      const envName = resolveTemplate(config.options?.environmentName || "", context);
+      const envName = resolveTemplate(opt(config.options?.environmentName) || "", context);
       return client.request(`/repos/${owner}/${repo}/environments/${envName}`);
     }
 
     case GitHubOperation.ENVIRONMENT_CREATE:
     case GitHubOperation.ENVIRONMENT_UPDATE: {
-      const envName = resolveTemplate(config.options?.environmentName || "", context);
+      const envName = resolveTemplate(opt(config.options?.environmentName) || "", context);
       const body: Record<string, unknown> = {};
       if (config.options?.waitTimer !== undefined) body.wait_timer = config.options.waitTimer;
       if (config.options?.reviewers) body.reviewers = config.options.reviewers;
@@ -218,25 +221,25 @@ export async function executeUserOrgOperations(
     }
 
     case GitHubOperation.ENVIRONMENT_DELETE: {
-      const envName = resolveTemplate(config.options?.environmentName || "", context);
+      const envName = resolveTemplate(opt(config.options?.environmentName) || "", context);
       await client.request(`/repos/${owner}/${repo}/environments/${envName}`, { method: "DELETE" });
       return { success: true };
     }
 
     case GitHubOperation.ENVIRONMENT_LIST_SECRETS: {
-      const envName = resolveTemplate(config.options?.environmentName || "", context);
+      const envName = resolveTemplate(opt(config.options?.environmentName) || "", context);
       return client.request(`/repos/${owner}/${repo}/environments/${envName}/secrets`);
     }
 
     case GitHubOperation.ENVIRONMENT_GET_SECRET: {
-      const envName = resolveTemplate(config.options?.environmentName || "", context);
-      const secretName = resolveTemplate(config.options?.secretName || "", context);
+      const envName = resolveTemplate(opt(config.options?.environmentName) || "", context);
+      const secretName = resolveTemplate(opt(config.options?.secretName) || "", context);
       return client.request(`/repos/${owner}/${repo}/environments/${envName}/secrets/${secretName}`);
     }
 
     case GitHubOperation.ENVIRONMENT_CREATE_SECRET: {
-      const envName = resolveTemplate(config.options?.environmentName || "", context);
-      const secretName = resolveTemplate(config.options?.secretName || "", context);
+      const envName = resolveTemplate(opt(config.options?.environmentName) || "", context);
+      const secretName = resolveTemplate(opt(config.options?.secretName) || "", context);
       if (!config.options?.encryptedValue || !config.options?.keyId) {
         throw new NonRetriableError("Creating environment secrets requires encryptedValue and keyId.");
       }
@@ -247,8 +250,8 @@ export async function executeUserOrgOperations(
     }
 
     case GitHubOperation.ENVIRONMENT_DELETE_SECRET: {
-      const envName = resolveTemplate(config.options?.environmentName || "", context);
-      const secretName = resolveTemplate(config.options?.secretName || "", context);
+      const envName = resolveTemplate(opt(config.options?.environmentName) || "", context);
+      const secretName = resolveTemplate(opt(config.options?.secretName) || "", context);
       await client.request(
         `/repos/${owner}/${repo}/environments/${envName}/secrets/${secretName}`,
         { method: "DELETE" }
@@ -257,76 +260,76 @@ export async function executeUserOrgOperations(
     }
 
     case GitHubOperation.ENVIRONMENT_LIST_PROTECTION_RULES: {
-      const envName = resolveTemplate(config.options?.environmentName || "", context);
+      const envName = resolveTemplate(opt(config.options?.environmentName) || "", context);
       return client.request(`/repos/${owner}/${repo}/environments/${envName}`);
     }
 
     // ── Package Operations (10) ────────────────────────────────────
     case GitHubOperation.PACKAGE_LIST_FOR_USER: {
-      const username = resolveTemplate(config.options?.username || owner || "", context);
+      const username = resolveTemplate(opt(config.options?.username) || opt(owner) || "", context);
       let endpoint = `/users/${username}/packages?per_page=${config.perPage || 30}`;
-      if (config.options?.packageType) endpoint += `&package_type=${config.options.packageType}`;
+      if (config.options?.packageType) endpoint += `&package_type=${opt(config.options.packageType)}`;
       return client.request(endpoint);
     }
 
     case GitHubOperation.PACKAGE_LIST_FOR_ORG: {
       let endpoint = `/orgs/${owner}/packages?per_page=${config.perPage || 30}`;
-      if (config.options?.packageType) endpoint += `&package_type=${config.options.packageType}`;
+      if (config.options?.packageType) endpoint += `&package_type=${opt(config.options.packageType)}`;
       if (config.state) endpoint += `&state=${config.state}`;
       return client.request(endpoint);
     }
 
     case GitHubOperation.PACKAGE_GET: {
-      const pkgType = config.options?.packageType || "npm";
-      const pkgName = resolveTemplate(config.options?.packageName || "", context);
+      const pkgType = opt(config.options?.packageType) || "npm";
+      const pkgName = resolveTemplate(opt(config.options?.packageName) || "", context);
       return client.request(`/orgs/${owner}/packages/${pkgType}/${pkgName}`);
     }
 
     case GitHubOperation.PACKAGE_DELETE: {
-      const pkgType = config.options?.packageType || "npm";
-      const pkgName = resolveTemplate(config.options?.packageName || "", context);
+      const pkgType = opt(config.options?.packageType) || "npm";
+      const pkgName = resolveTemplate(opt(config.options?.packageName) || "", context);
       await client.request(`/orgs/${owner}/packages/${pkgType}/${pkgName}`, { method: "DELETE" });
       return { success: true };
     }
 
     case GitHubOperation.PACKAGE_RESTORE: {
-      const pkgType = config.options?.packageType || "npm";
-      const pkgName = resolveTemplate(config.options?.packageName || "", context);
+      const pkgType = opt(config.options?.packageType) || "npm";
+      const pkgName = resolveTemplate(opt(config.options?.packageName) || "", context);
       await client.request(`/orgs/${owner}/packages/${pkgType}/${pkgName}/restore`, { method: "POST" });
       return { success: true };
     }
 
     case GitHubOperation.PACKAGE_LIST_VERSIONS: {
-      const pkgType = config.options?.packageType || "npm";
-      const pkgName = resolveTemplate(config.options?.packageName || "", context);
+      const pkgType = opt(config.options?.packageType) || "npm";
+      const pkgName = resolveTemplate(opt(config.options?.packageName) || "", context);
       return client.request(`/orgs/${owner}/packages/${pkgType}/${pkgName}/versions?per_page=${config.perPage || 30}`);
     }
 
     case GitHubOperation.PACKAGE_GET_VERSION: {
-      const pkgType = config.options?.packageType || "npm";
-      const pkgName = resolveTemplate(config.options?.packageName || "", context);
-      const versionId = config.options?.versionId;
+      const pkgType = opt(config.options?.packageType) || "npm";
+      const pkgName = resolveTemplate(opt(config.options?.packageName) || "", context);
+      const versionId = opt(config.options?.versionId);
       return client.request(`/orgs/${owner}/packages/${pkgType}/${pkgName}/versions/${versionId}`);
     }
 
     case GitHubOperation.PACKAGE_DELETE_VERSION: {
-      const pkgType = config.options?.packageType || "npm";
-      const pkgName = resolveTemplate(config.options?.packageName || "", context);
-      const versionId = config.options?.versionId;
+      const pkgType = opt(config.options?.packageType) || "npm";
+      const pkgName = resolveTemplate(opt(config.options?.packageName) || "", context);
+      const versionId = opt(config.options?.versionId);
       await client.request(`/orgs/${owner}/packages/${pkgType}/${pkgName}/versions/${versionId}`, { method: "DELETE" });
       return { success: true };
     }
 
     case GitHubOperation.PACKAGE_RESTORE_VERSION: {
-      const pkgType = config.options?.packageType || "npm";
-      const pkgName = resolveTemplate(config.options?.packageName || "", context);
-      const versionId = config.options?.versionId;
+      const pkgType = opt(config.options?.packageType) || "npm";
+      const pkgName = resolveTemplate(opt(config.options?.packageName) || "", context);
+      const versionId = opt(config.options?.versionId);
       await client.request(`/orgs/${owner}/packages/${pkgType}/${pkgName}/versions/${versionId}/restore`, { method: "POST" });
       return { success: true };
     }
 
     case GitHubOperation.PACKAGE_LIST_DOCKER_IMAGES: {
-      const pkgName = resolveTemplate(config.options?.packageName || "", context);
+      const pkgName = resolveTemplate(opt(config.options?.packageName) || "", context);
       return client.request(`/orgs/${owner}/packages/container/${pkgName}/versions?per_page=${config.perPage || 30}`);
     }
 

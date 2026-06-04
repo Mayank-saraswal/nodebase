@@ -72,9 +72,13 @@ export function GitHubTriggerDialog({
     })
   }
 
-  const handleCopy = (text: string, name: string) => {
-    navigator.clipboard.writeText(text)
-    toast.success(`${name} copied to clipboard`)
+  const handleCopy = async (text: string, name: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      toast.success(`${name} copied to clipboard`)
+    } catch {
+      toast.error(`Failed to copy ${name}`)
+    }
   }
 
   const webhookUrl = typeof window !== "undefined" && nodeData?.webhookId 
