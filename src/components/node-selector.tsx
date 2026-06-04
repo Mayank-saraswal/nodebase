@@ -77,6 +77,12 @@ const triggerNodes: NodeTypeOptions[] = [
         description:"When WhatsApp message is received",
         icon:"/logos/whatsapp.svg",
     },
+    {
+        type:NodeType.GITHUB_TRIGGER,
+        label:"GitHub Trigger",
+        description:"When a GitHub event occurs (push, pull request, etc.)",
+        icon:"/logos/github.svg",
+    },
 ]
 
 const executionNodes: NodeTypeOptions[] = [
@@ -305,7 +311,12 @@ const executionNodes: NodeTypeOptions[] = [
         description:"Execute secure, parameterized database queries",
         icon:Database
     },
-
+    {
+        type:NodeType.GITHUB,
+        label:"GitHub",
+        description:"Interact with GitHub Repositories, Users, and Projects",
+        icon:"/logos/github.svg"
+    },
 ]
 
 interface NodeSelectorProps{
