@@ -8,7 +8,6 @@ import { fetchGitHubRealtimeToken } from "./actions"
 import { GITHUB_CHANNEL_NAME } from "@/inngest/channels/github"
 import { useParams } from "next/navigation"
 import { GitHubConfig } from "./types"
-import { Github } from "lucide-react"
 
 type GitHubNodeData = GitHubConfig & {
   [key: string]: unknown
@@ -51,7 +50,7 @@ export const GitHubNode = memo((props: NodeProps<GitHubNodeType>) => {
         name="GitHub"
         id={props.id}
         status={nodeStatus}
-        icon={Github}
+        icon="/logos/github.svg"
         description={description}
         onSettings={handleOpenSettings}
         onDoubleClick={handleOpenSettings}

@@ -6,7 +6,6 @@ import { GitHubTriggerDialog } from "./dialog"
 import { useNodeStatus } from "../shared/hooks/use-node-status"
 import { fetchWebhookTriggerRealtimeToken } from "../webhook-trigger/actions"
 import { WEBHOOK_TRIGGER_CHANNEL_NAME } from "@/inngest/channels/webhook-trigger"
-import { Github } from "lucide-react"
 
 export const GitHubTriggerNode = memo((props: NodeProps) => {
   // We can reuse the webhook-trigger channel since it's just a status update
@@ -33,7 +32,7 @@ export const GitHubTriggerNode = memo((props: NodeProps) => {
       />
       <BaseTriggerNode
         {...props}
-        icon={Github}
+        icon="/logos/github.svg"
         name="GitHub Trigger"
         status={nodeStatus}
         description="On GitHub event"

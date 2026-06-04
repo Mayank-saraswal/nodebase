@@ -22,7 +22,7 @@ import { useTRPC } from "@/trpc/client"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useCredentialsByType } from "@/features/credentials/hooks/use-credentials"
 import { CredentialType, GitHubOperation } from "@/generated/prisma"
-import { Loader2Icon, Github } from "lucide-react"
+import { Loader2Icon } from "lucide-react"
 import Link from "next/link"
 import { Separator } from "@/components/ui/separator"
 
@@ -165,7 +165,7 @@ export function GitHubDialog({
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Github className="h-5 w-5" />
+            <img src="/logos/github.svg" alt="GitHub" className="h-5 w-5" />
             GitHub Node Configuration
           </DialogTitle>
           <DialogDescription>

@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useTRPC } from "@/trpc/client"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Loader2Icon, Github, Copy } from "lucide-react"
+import { Loader2Icon, Copy } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
 import { toast } from "sonner"
 
@@ -90,7 +90,7 @@ export function GitHubTriggerDialog({
       <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Github className="h-5 w-5" />
+            <img src="/logos/github.svg" alt="GitHub" className="h-5 w-5" />
             GitHub Trigger
           </DialogTitle>
           <DialogDescription>
