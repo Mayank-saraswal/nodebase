@@ -122,6 +122,7 @@ export function GitHubDialog({
         prerelease: false,
         options: {},
       })
+
     }
   }, [nodeData])
 

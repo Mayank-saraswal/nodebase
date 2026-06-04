@@ -13,7 +13,6 @@ interface GenericFieldsProps {
 
 export function GenericFields({ values, setValues }: GenericFieldsProps) {
   const op = values.operation || ""
-
   const isSearch = op.startsWith("SEARCH_")
   const isUser = op.startsWith("USER_")
   const isOrg = op.startsWith("ORG_")
@@ -135,7 +134,8 @@ export function GenericFields({ values, setValues }: GenericFieldsProps) {
           onChange={(e) => {
             setOptionsText(e.target.value)
             try {
-              setValues({ ...values, options: JSON.parse(e.target.value) })
+              const parsed = JSON.parse(e.target.value)
+              setValues({ ...values, options: parsed })
             } catch {
               // Allow invalid JSON while typing — local state preserves edits
             }

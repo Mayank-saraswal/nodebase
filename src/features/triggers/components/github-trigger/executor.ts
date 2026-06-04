@@ -1,5 +1,5 @@
 import type { NodeExecutor } from "@/features/executions/types";
-import { githubChannel } from "@/inngest/channels/github";
+import { webhookTriggerChannel } from "@/inngest/channels/webhook-trigger";
 
 type GitHubTriggerData = Record<string, unknown>;
 
@@ -10,7 +10,7 @@ export const githubTriggerExecutor: NodeExecutor<GitHubTriggerData> = async ({
   publish,
 }) => {
   await publish(
-    githubChannel().status({
+    webhookTriggerChannel().status({
       nodeId,
       status: "loading",
     })
@@ -20,7 +20,7 @@ export const githubTriggerExecutor: NodeExecutor<GitHubTriggerData> = async ({
     const result = await step.run("github-trigger", async () => context);
 
     await publish(
-      githubChannel().status({
+      webhookTriggerChannel().status({
         nodeId,
         status: "success",
       })
@@ -29,7 +29,7 @@ export const githubTriggerExecutor: NodeExecutor<GitHubTriggerData> = async ({
     return result;
   } catch (error) {
     await publish(
-      githubChannel().status({
+      webhookTriggerChannel().status({
         nodeId,
         status: "error",
       })

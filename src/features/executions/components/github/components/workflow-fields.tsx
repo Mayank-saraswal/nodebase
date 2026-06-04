@@ -191,7 +191,8 @@ export function WorkflowFields({ values, setValues }: WorkflowFieldsProps) {
             onChange={(e) => {
               setOptionsText(e.target.value)
               try {
-                setValues({ ...values, options: JSON.parse(e.target.value) })
+                const parsed = JSON.parse(e.target.value)
+                setValues({ ...values, options: parsed })
               } catch {
                 // Allow invalid JSON while typing — local state preserves edits
               }
