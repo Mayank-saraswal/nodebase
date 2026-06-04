@@ -23,7 +23,7 @@ import prisma from "./db"
  trustedOrigins: [
     "https://nodebase.mayanksaraswal.in",
     "https://www.nodebase.mayanksaraswal.in",
-    // DigitalOcean App Platform URLs are handled by nodebase.mayanksaraswal.in domain
+    "https://nodebase-l8md4.ondigitalocean.app",
     "https://vast-lemur-notable.ngrok-free.app",
     "http://localhost:3000"
  ],
@@ -38,6 +38,6 @@ import prisma from "./db"
    }
  },
  plugins:[],
- baseURL: process.env.BETTER_AUTH_URL,
+ baseURL: process.env.BETTER_AUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "https://nodebase.mayanksaraswal.in",
  secret: process.env.BETTER_AUTH_SECRET
 });

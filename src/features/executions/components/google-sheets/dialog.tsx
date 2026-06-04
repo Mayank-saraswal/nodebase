@@ -132,7 +132,7 @@ export const GoogleSheetsDialog = ({
   // Pre-fill from DB config when loaded
   useEffect(() => {
     if (config) {
-      setCredentialId(config.credentialId)
+      setCredentialId(config.credentialId || "")
       setOperation(config.operation as GoogleSheetsOp)
       setVariableName(config.variableName || "googleSheets")
       setSpreadsheetId(config.spreadsheetId)

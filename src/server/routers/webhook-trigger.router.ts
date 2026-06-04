@@ -2,6 +2,7 @@ import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import prisma from "@/lib/db";
 import { randomUUID } from "crypto";
 import { z } from "zod";
+import { encryptWebhookSecret } from "@/lib/webhook-secret";
 
 export const webhookTriggerRouter = createTRPCRouter({
     getByWorkflowId: protectedProcedure
@@ -18,7 +19,7 @@ export const webhookTriggerRouter = createTRPCRouter({
             return prisma.webhookTrigger.create({
                 data: {
                     workflowId: input.workflowId,
-                    secretToken: randomUUID(),
+                    secretTokenEncrypted: encryptWebhookSecret(randomUUID()),
                 },
             });
         }),

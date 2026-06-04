@@ -31,11 +31,9 @@ export async function POST(req: NextRequest) {
             emailVerifyExpiry: getTokenExpiry(),
           },
         })
-        try {
-          await sendVerificationEmail(email, existing.name || email, token)
-        } catch (emailError) {
+        sendVerificationEmail(email, existing.name || email, token).catch(emailError => {
           console.error("Failed to send verification email:", emailError)
-        }
+        })
         return NextResponse.json({ success: "VERIFICATION_SENT", email })
       }
     }
@@ -74,16 +72,16 @@ export async function POST(req: NextRequest) {
     })
 
     // 5. Send verification email (non-blocking)
-    try {
-      await sendVerificationEmail(email, user.name || email, verifyToken)
-    } catch (emailError) {
+    sendVerificationEmail(email, user.name || email, verifyToken).catch(emailError => {
       console.error("Failed to send verification email:", emailError)
-    }
+    })
 
     // 6. DO NOT log them in — return success directive
     return NextResponse.json({ success: "VERIFICATION_SENT", email })
   } catch (error) {
     console.error("Signup error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return NextResponse.json({ 
+      error: "Internal server error" 
+    }, { status: 500 })
   }
 }

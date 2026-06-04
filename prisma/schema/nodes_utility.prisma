@@ -1,0 +1,312 @@
+// ─────────────────────────────────────────────────────────────
+// Nodebase — Prisma Schema: Utility & Misc Node Models
+// AINode, MediaUploadNode, SortNode, FilterNode,
+// AggregateNode, PostgresNode
+// ─────────────────────────────────────────────────────────────
+
+model AINode {
+  id           String      @id @default(cuid())
+  nodeId       String      @unique
+  workflowId   String
+  credentialId String?
+  credential   Credential? @relation(fields: [credentialId], references: [id], onDelete: SetNull)
+
+  provider     AIProvider
+  operation    AIOperation @default(CHAT)
+  variableName String      @default("ai")
+
+  model String @default("")
+
+  systemPrompt String @default("") @db.Text
+  userPrompt   String @default("") @db.Text
+
+  temperature      Float @default(0.7)
+  maxTokens        Int   @default(1000)
+  topP             Float @default(1.0)
+  frequencyPenalty Float @default(0.0)
+  presencePenalty  Float @default(0.0)
+
+  responseFormat String @default("text")
+  jsonSchema     String @default("") @db.Text
+
+  toolsJson  String @default("[]") @db.Text
+  toolChoice String @default("auto")
+
+  imageUrl    String @default("")
+  imageUrls   String @default("[]") @db.Text
+  imageDetail String @default("auto")
+
+  historyKey String @default("")
+  maxHistory Int    @default(10)
+
+  embeddingInput String @default("") @db.Text
+
+  audioUrl            String @default("")
+  audioLanguage       String @default("")
+  transcriptionFormat String @default("text")
+
+  imagePrompt  String @default("") @db.Text
+  imageSize    String @default("1024x1024")
+  imageQuality String @default("standard")
+  imageStyle   String @default("vivid")
+  imageCount   Int    @default(1)
+
+  classifyLabels   String @default("") @db.Text
+  classifyExamples String @default("[]") @db.Text
+
+  continueOnFail Boolean @default(false)
+  timeout        Int     @default(60000)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workflow workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+  @@index([nodeId])
+}
+
+model MediaUploadNode {
+  id         String @id @default(cuid())
+  nodeId     String @unique
+  workflowId String
+
+  source       MediaUploadSource @default(URL)
+  inputField   String            @default("")
+  mimeTypeHint String            @default("image/png")
+  filename     String            @default("")
+
+  // For Google Drive source
+  credentialId String?
+  credential   Credential? @relation(fields: [credentialId], references: [id], onDelete: SetNull)
+
+  variableName   String  @default("media")
+  continueOnFail Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workflow workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+  @@index([nodeId])
+}
+
+model SortNode {
+  id         String @id @default(cuid())
+  nodeId     String @unique
+  workflowId String
+
+  // Operation mode
+  // "SORT_ARRAY"     — sort array of objects or primitives
+  // "SORT_KEYS"      — sort the keys of an object
+  // "REVERSE"        — reverse array order
+  // "SHUFFLE"        — random order (Fisher-Yates)
+  operation String @default("SORT_ARRAY")
+
+  // JSON-serialized array of SortKey objects:
+  // [{ field: string, direction: "asc"|"desc", type: "auto"|"string"|
+  //    "number"|"date"|"boolean", nulls: "first"|"last",
+  //    caseSensitive: boolean, locale: string, natural: boolean }]
+  sortKeys String @default("[]") @db.Text
+
+  // Input path — dot-notation path to the array inside context
+  // e.g. "googleSheets.rows" or "razorpayTrigger.payload.items"
+  // Empty string = use the entire previous node output
+  inputPath String @default("")
+
+  // Variable name for output
+  variableName String @default("sort")
+
+  // Whether to sort in-place (mutate) or return new array
+  // Always false in executor — immutable by default
+  // Kept for future UI hint
+  inPlace Boolean @default(false)
+
+  workflow workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model FilterNode {
+  id         String @id @default(cuid())
+  nodeId     String @unique
+  workflowId String
+
+  operation       String  @default("FILTER_ARRAY")
+  inputArray      String  @default("") @db.Text
+  inputObject     String  @default("") @db.Text
+  conditionGroups String  @default("[]") @db.Text
+  rootLogic       String  @default("AND")
+  outputMode      String  @default("filtered")
+  variableName    String  @default("filter")
+  stopOnEmpty     Boolean @default(false)
+  includeMetadata Boolean @default(false)
+  continueOnFail  Boolean @default(false)
+
+  // FILTER_OBJECT_KEYS specific:
+  keyFilterMode String  @default("key_name")
+  keepMatching  Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workflow workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+  @@index([nodeId])
+}
+
+model AggregateNode {
+  id         String @id @default(cuid())
+  nodeId     String @unique
+  workflowId String
+
+  // Primary operation
+  operation String @default("COUNT")
+
+  // Dot-notation path to the input array
+  inputPath String @default("") @db.Text
+
+  // Dot-notation field within each item to aggregate
+  field String @default("") @db.Text
+
+  // For GROUP_BY: field to group items by
+  groupByField String @default("")
+
+  // For PIVOT: row field, column field, value field, value operation
+  pivotRowField   String @default("")
+  pivotColField   String @default("")
+  pivotValueField String @default("")
+  pivotValueOp    String @default("SUM")
+
+  // For CONCATENATE: separator string (default ", ")
+  separator String @default(", ")
+
+  // For PERCENTILE: the percentile to compute (0–100)
+  percentile Float @default(90)
+
+  // For COUNT: optional filter condition (JSON FilterCondition[])
+  countFilter String @default("") @db.Text
+
+  // For MULTI: JSON array of AggregateOperation objects
+  multiOps String @default("[]") @db.Text
+
+  // For GROUP_BY with nested aggregation:
+  groupAggOps String @default("[]") @db.Text
+
+  // Output options
+  variableName   String  @default("aggregate")
+  includeInput   Boolean @default(false)
+  sortOutput     Boolean @default(true)
+  topN           Int     @default(0)
+  nullHandling   String  @default("exclude")
+  roundDecimals  Int     @default(2)
+  continueOnFail Boolean @default(false)
+
+  workflow workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([workflowId])
+  @@index([nodeId])
+}
+
+model PostgresNode {
+  id         String @id @default(cuid())
+  nodeId     String @unique
+  workflowId String
+
+  // The operation to perform
+  operation String @default("EXECUTE_QUERY")
+
+  // Credential reference
+  credentialId String?
+
+  // For visual query builder (SELECT, UPDATE, DELETE, COUNT, EXISTS, UPSERT):
+  tableName  String @default("") // target table
+  schemaName String @default("public")
+
+  // SELECT options:
+  // JSON array of column names to return. [] = SELECT *
+  selectColumns   String @default("[]") @db.Text
+  // JSON array of WhereCondition objects
+  whereConditions String @default("[]") @db.Text
+  // JSON array of OrderBy objects: [{ column, direction }]
+  orderBy         String @default("[]") @db.Text
+  // LIMIT rows. 0 = no limit
+  limitRows       Int    @default(0)
+  // OFFSET for pagination
+  offsetRows      Int    @default(0)
+  // JOIN configuration: JSON array of JoinClause objects
+  joins           String @default("[]") @db.Text
+
+  // INSERT / UPSERT:
+  // JSON object or template string that resolves to row data
+  insertData       String @default("") @db.Text
+  // For UPSERT: column(s) to check for conflict
+  conflictColumns  String @default("[]") @db.Text
+  // For UPSERT: columns to update on conflict. [] = all non-conflict columns
+  updateOnConflict String @default("[]") @db.Text
+
+  // UPDATE:
+  // JSON object of { column: newValue } — supports template expressions
+  updateData String @default("") @db.Text
+
+  // INSERT_MANY:
+  // Template path to array of row objects: "{{filter.items}}"
+  insertManyPath    String @default("") @db.Text
+  // Column names to insert. [] = infer from first row
+  insertManyColumns String @default("[]") @db.Text
+
+  // EXECUTE_QUERY:
+  // Raw SQL with $1, $2... placeholders
+  query       String @default("") @db.Text
+  // JSON array of query parameters [value1, value2...]
+  queryParams String @default("[]") @db.Text
+
+  // EXECUTE_TRANSACTION:
+  // JSON array of { query, params } objects — run atomically
+  transactionStatements String @default("[]") @db.Text
+
+  // EXECUTE_FUNCTION:
+  functionName String @default("")
+  functionArgs String @default("[]") @db.Text // JSON array
+
+  // FULL_TEXT_SEARCH:
+  searchColumn   String @default("")
+  searchQuery    String @default("")
+  searchLanguage String @default("english") // pg language: "simple", "english", etc.
+  searchLimit    Int    @default(10)
+
+  // JSON_PATH_QUERY:
+  jsonColumn String @default("")
+  jsonPath   String @default("") // e.g. '$.payment.amount'
+
+  // JSON_SET_FIELD:
+  jsonSetColumn String @default("")
+  jsonSetPath   String @default("") // e.g. '{payment,status}'
+  jsonSetValue  String @default("") // new value (supports template)
+
+  // CREATE_TABLE:
+  // JSON array of ColumnDefinition objects
+  columnDefinitions      String  @default("[]") @db.Text
+  createTableIfNotExists Boolean @default(true)
+
+  // Output options
+  variableName   String  @default("postgres")
+  returnData     Boolean @default(true) // whether to return affected rows
+  continueOnFail Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workflow   workflow    @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  credential Credential? @relation(fields: [credentialId], references: [id], onDelete: SetNull)
+
+  @@index([workflowId])
+  @@index([nodeId])
+  @@index([credentialId])
+}

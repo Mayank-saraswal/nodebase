@@ -208,7 +208,6 @@ export const slackExecutor: NodeExecutor<SlackData> = async ({
       const channelPurpose = resolveTemplate(config.channelPurpose, context)
       const slackUserId = resolveTemplate(config.userId, context)
       const emoji = resolveTemplate(config.emoji, context)
-      const webhookUrl = resolveTemplate(config.webhookUrl, context)
       const blockKit = resolveTemplate(config.blockKit, context)
       const botName = resolveTemplate(config.botName, context)
       const iconEmojiVal = resolveTemplate(config.iconEmoji, context)
@@ -232,8 +231,7 @@ export const slackExecutor: NodeExecutor<SlackData> = async ({
         // ── Message Operations ──
 
         case SlackOperation.MESSAGE_SEND_WEBHOOK: {
-          const url =
-            creds?.type === "webhook" ? creds.webhookUrl : webhookUrl
+          const url = creds?.type === "webhook" ? creds.webhookUrl : ""
           if (!url) {
             throw new NonRetriableError(
               "Slack: webhook URL is required for MESSAGE_SEND_WEBHOOK"

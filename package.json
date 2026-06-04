@@ -15,7 +15,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "migrate:razorpay-secrets": "tsx scripts/migrate-razorpay-secrets.ts",
-    "migrate:whatsapp-tokens": "tsx scripts/migrate-whatsapp-tokens.ts"
+    "migrate:whatsapp-tokens": "tsx scripts/migrate-whatsapp-tokens.ts",
+    "migrate:webhook-secrets": "tsx scripts/migrate-webhook-secrets.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.37",
