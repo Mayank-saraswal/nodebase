@@ -45,6 +45,7 @@ async function main() {
         },
         data: {
           webhookSecretEncrypted: encrypted,
+          webhookSecret: null,
         },
       })
 

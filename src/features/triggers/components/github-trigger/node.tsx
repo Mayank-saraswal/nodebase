@@ -29,6 +29,7 @@ export const GitHubTriggerNode = memo((props: NodeProps) => {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         nodeId={props.id}
+        workflowId={props.data?.workflowId as string | undefined}
       />
       <BaseTriggerNode
         {...props}

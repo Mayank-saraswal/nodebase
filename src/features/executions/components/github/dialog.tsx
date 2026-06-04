@@ -122,10 +122,8 @@ export function GitHubDialog({
         prerelease: false,
         options: {},
       })
-
     }
-  }, [nodeData])
-
+  }, [nodeData, nodeId])
   const { mutate: upsertNode, isPending } = useMutation(
     trpc.github.upsert.mutationOptions({
       onSuccess: () => {

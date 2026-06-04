@@ -54,17 +54,14 @@ export class GitHubClient {
     });
 
     // Handle rate limiting
-    if (response.status === 403 || response.status === 429) {
-      const remaining = response.headers.get("x-ratelimit-remaining");
-      if (remaining === "0" || remaining === null) {
-        const resetRaw = response.headers.get("x-ratelimit-reset");
-        const resetTime = resetRaw && Number.isFinite(Number(resetRaw))
-          ? new Date(Number(resetRaw) * 1000).toISOString()
-          : "unknown";
-        throw new NonRetriableError(
-          `GitHub API rate limit exceeded. Resets at ${resetTime}`
-        );
-      }
+    if ((response.status === 403 || response.status === 429) && response.headers.get("x-ratelimit-remaining") === "0") {
+      const resetRaw = response.headers.get("x-ratelimit-reset");
+      const resetTime = resetRaw && Number.isFinite(Number(resetRaw))
+        ? new Date(Number(resetRaw) * 1000).toISOString()
+        : "unknown";
+      throw new NonRetriableError(
+        `GitHub API rate limit exceeded. Resets at ${resetTime}`
+      );
     }
 
     if (!response.ok) {
@@ -83,7 +80,7 @@ export class GitHubClient {
     const contentType = response.headers.get("content-type");
     if (contentType && !contentType.includes("application/json")) {
       const text = await response.text();
-      return { data: text as any, headers: response.headers, status: response.status };
+      return { data: text as unknown as T, headers: response.headers, status: response.status };
     }
 
     const data = await response.json();

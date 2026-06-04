@@ -368,8 +368,15 @@ export async function executeRepositoryOperations(
       const body: Record<string, unknown> = {};
       if (config.body) body.description = resolveTemplate(config.body, context);
       if (config.options?.files) {
-        body.files = typeof config.options.files === "string"
-          ? JSON.parse(config.options.files) : config.options.files;
+        if (typeof config.options.files === "string") {
+          try {
+            body.files = JSON.parse(config.options.files);
+          } catch (error) {
+            throw new Error(`Invalid JSON in GIST_UPDATE files: ${(error as Error).message}`);
+          }
+        } else {
+          body.files = config.options.files;
+        }
       }
       return client.request(`/gists/${config.options?.gistId}`, { method: "PATCH", body });
     }

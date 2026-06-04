@@ -303,7 +303,7 @@ export async function executeSearchMiscOperations(
     case GitHubOperation.RULESET_LIST_ORG_RULESETS:
       return client.request(`/orgs/${owner}/rulesets`);
 
-    // ── Projects V2 Operations (12) ────────────────────────────────
+    // ── Classic Projects Operations (Deprecated - V2 requires GraphQL) ────────────────────────────────
     case GitHubOperation.PROJECT_V2_LIST:
       return client.request(`/orgs/${owner}/projects?per_page=${config.perPage || 30}`);
 
