@@ -119,5 +119,5 @@ export const githubExecutor: NodeExecutor<GitHubNodeData> = async ({
   }
 
   await publish(githubChannel().status({ nodeId, status: "success" }));
-  return result;
+  return { ...context, ...result };
 };

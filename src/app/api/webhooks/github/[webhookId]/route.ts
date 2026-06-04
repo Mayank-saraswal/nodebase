@@ -3,6 +3,7 @@ import prisma from "@/lib/db";
 import { claimIdempotencyKey } from "@/lib/redis";
 import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { decryptWebhookSecret } from "@/lib/webhook-secret";
 
 function verifyGitHubSignature(
   secret: string,
@@ -24,9 +25,13 @@ export async function POST(
   { params }: { params: Promise<{ webhookId: string }> }
 ) {
   try {
-    const contentLength = request.headers.get("content-length");
-    if (contentLength && parseInt(contentLength) > 10_000_000) {
+    const contentLengthHeader = request.headers.get("content-length");
+    const contentLength = contentLengthHeader ? parseInt(contentLengthHeader, 10) : NaN;
+    if (!isNaN(contentLength) && isFinite(contentLength) && contentLength > 10_000_000) {
       return NextResponse.json({ error: "Payload too large" }, { status: 413 });
+    }
+    if (contentLengthHeader && (isNaN(contentLength) || !isFinite(contentLength) || contentLength < 0)) {
+      return NextResponse.json({ error: "Invalid content-length header" }, { status: 400 });
     }
 
     const { webhookId } = await params;
@@ -53,9 +58,13 @@ export async function POST(
     const signature = request.headers.get("x-hub-signature-256") || "";
 
     // Verify signature if a secret is configured
-    if (webhookTrigger.webhookSecret) {
+    if (webhookTrigger.webhookSecretEncrypted || webhookTrigger.webhookSecret) {
+      const secret = decryptWebhookSecret(
+        webhookTrigger.webhookSecretEncrypted,
+        webhookTrigger.webhookSecret
+      );
       const isValid = verifyGitHubSignature(
-        webhookTrigger.webhookSecret,
+        secret,
         rawTextBody,
         signature
       );

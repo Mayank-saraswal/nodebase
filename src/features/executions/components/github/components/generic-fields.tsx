@@ -2,6 +2,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { GitHubConfig } from "../types"
+import { useEffect, useState } from "react"
 
 interface GenericFieldsProps {
   values: Partial<GitHubConfig>
@@ -10,6 +11,13 @@ interface GenericFieldsProps {
 
 export function GenericFields({ values, setValues }: GenericFieldsProps) {
   const op = values.operation || ""
+  const [optionsText, setOptionsText] = useState(
+    JSON.stringify(values.options || {}, null, 2)
+  )
+
+  useEffect(() => {
+    setOptionsText(JSON.stringify(values.options || {}, null, 2))
+  }, [values.options])
 
   const isSearch = op.startsWith("SEARCH_")
   const isUser = op.startsWith("USER_")
@@ -115,10 +123,12 @@ export function GenericFields({ values, setValues }: GenericFieldsProps) {
         <Label>Advanced Options (JSON)</Label>
         <Textarea
           placeholder='{"key": "value"}'
-          value={typeof values.options === "object" ? JSON.stringify(values.options, null, 2) : "{}"}
+          value={optionsText}
           onChange={(e) => {
+            setOptionsText(e.target.value)
             try {
-              setValues({ ...values, options: JSON.parse(e.target.value) })
+              const parsed = JSON.parse(e.target.value)
+              setValues({ ...values, options: parsed })
             } catch {
               // Allow invalid JSON while typing
             }

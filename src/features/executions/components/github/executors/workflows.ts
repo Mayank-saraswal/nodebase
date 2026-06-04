@@ -26,9 +26,17 @@ export async function executeWorkflowOperations(
 
     case GitHubOperation.WORKFLOW_DISPATCH: {
       const ref = resolveTemplate(config.branch || "main", context);
-      const inputs = config.clientPayload
-        ? JSON.parse(resolveTemplate(config.clientPayload, context))
-        : {};
+      let inputs = {};
+      if (config.clientPayload) {
+        const resolvedPayload = resolveTemplate(config.clientPayload, context);
+        try {
+          inputs = JSON.parse(resolvedPayload);
+        } catch (error) {
+          throw new NonRetriableError(
+            `Invalid JSON in workflow dispatch inputs: ${error instanceof Error ? error.message : String(error)}. Payload: ${resolvedPayload}`
+          );
+        }
+      }
       await client.request(
         `/repos/${owner}/${repo}/actions/workflows/${workflowId}/dispatches`,
         { method: "POST", body: { ref, inputs } }

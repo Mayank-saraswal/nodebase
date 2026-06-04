@@ -68,7 +68,8 @@ model GitHubTriggerNode {
   events String @default("[\"push\"]") // JSON string array of GitHub webhook events
 
   webhookId String? // The ID of the webhook created in GitHub, to allow cleanup
-  webhookSecret String? // The secret used to verify the incoming payload
+  webhookSecret String? // DEPRECATED: Use webhookSecretEncrypted instead. The secret used to verify the incoming payload
+  webhookSecretEncrypted String? // Encrypted webhook secret for signature verification
 
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt

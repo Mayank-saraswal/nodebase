@@ -28,6 +28,14 @@ export class GitHubClient {
     endpoint: string,
     options: RequestOptions = {}
   ): Promise<T> {
+    const response = await this.requestWithHeaders<T>(endpoint, options);
+    return response.data;
+  }
+
+  private async requestWithHeaders<T = any>(
+    endpoint: string,
+    options: RequestOptions = {}
+  ): Promise<{ data: T; headers: Headers }> {
     const url = `${this.baseUrl}${endpoint}`;
     const response = await fetch(url, {
       method: options.method || "GET",
@@ -55,16 +63,18 @@ export class GitHubClient {
 
     // Handle 204 No Content
     if (response.status === 204) {
-      return {} as T;
+      return { data: {} as T, headers: response.headers };
     }
-    
+
     // For raw contents (like file downloads)
     const contentType = response.headers.get("content-type");
     if (contentType && !contentType.includes("application/json")) {
-        return response.text() as any;
+      const text = await response.text();
+      return { data: text as any, headers: response.headers };
     }
 
-    return response.json();
+    const data = await response.json();
+    return { data, headers: response.headers };
   }
 
   private getErrorMessage(status: number, error: any): string {
@@ -90,19 +100,19 @@ export class GitHubClient {
     while (true) {
       const separator = endpoint.includes("?") ? "&" : "?";
       const url = `${endpoint}${separator}per_page=${perPage}&page=${page}`;
-      const response = await fetch(`${this.baseUrl}${url}`, {
-        headers: this.headers,
+
+      const { data, headers } = await this.requestWithHeaders<T[]>(url, {
+        method: "GET",
       });
-      
-      const data = await response.json();
+
       if (!Array.isArray(data) || data.length === 0) break;
-      
+
       yield data;
-      
+
       // Check Link header for next page
-      const linkHeader = response.headers.get("link");
+      const linkHeader = headers.get("link");
       if (!linkHeader?.includes('rel="next"')) break;
-      
+
       page++;
     }
   }

@@ -5,6 +5,19 @@ import { resolveTemplate } from "@/features/executions/lib/template-resolver";
 import { NonRetriableError } from "inngest";
 
 /**
+ * Safe JSON parser that throws NonRetriableError on failure
+ */
+function safeParseJson<T = unknown>(value: string, fieldName: string): T {
+  try {
+    return JSON.parse(value) as T;
+  } catch (error) {
+    throw new NonRetriableError(
+      `Invalid JSON in ${fieldName}: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
+/**
  * Handles all Issue, Pull Request, and Discussion operations.
  * Maps to spec sections: 2 (Issue - 14 ops), 3 (PR - 13 ops), 12 (Discussion - 5 ops)
  */
@@ -24,9 +37,15 @@ export async function executeIssuesPrsOperations(
         title: resolveTemplate(config.title || "", context),
         body: resolveTemplate(config.body || "", context),
       };
-      if (config.labels) body.labels = JSON.parse(config.labels);
-      if (config.assignees) body.assignees = JSON.parse(config.assignees);
-      if (config.options?.milestone) body.milestone = parseInt(config.options.milestone);
+      if (config.labels) body.labels = safeParseJson(config.labels, 'labels');
+      if (config.assignees) body.assignees = safeParseJson(config.assignees, 'assignees');
+      if (config.options?.milestone) {
+        const milestoneNum = Number(config.options.milestone);
+        if (!Number.isFinite(milestoneNum)) {
+          throw new NonRetriableError(`Invalid milestone value: ${config.options.milestone}`);
+        }
+        body.milestone = milestoneNum;
+      }
       const data = await client.request(`/repos/${owner}/${repo}/issues`, { method: "POST", body });
       return {
         issueId: data.id, issueNumber: data.number,
@@ -56,9 +75,15 @@ export async function executeIssuesPrsOperations(
       if (config.body) body.body = resolveTemplate(config.body, context);
       if (config.state) body.state = config.state;
       if (config.options?.stateReason) body.state_reason = config.options.stateReason;
-      if (config.labels) body.labels = JSON.parse(config.labels);
-      if (config.assignees) body.assignees = JSON.parse(config.assignees);
-      if (config.options?.milestone) body.milestone = parseInt(config.options.milestone);
+      if (config.labels) body.labels = safeParseJson(config.labels, 'labels');
+      if (config.assignees) body.assignees = safeParseJson(config.assignees, 'assignees');
+      if (config.options?.milestone) {
+        const milestoneNum = Number(config.options.milestone);
+        if (!Number.isFinite(milestoneNum)) {
+          throw new NonRetriableError(`Invalid milestone value: ${config.options.milestone}`);
+        }
+        body.milestone = milestoneNum;
+      }
       const data = await client.request(
         `/repos/${owner}/${repo}/issues/${issueNumber}`,
         { method: "PATCH", body }
@@ -107,7 +132,7 @@ export async function executeIssuesPrsOperations(
     }
 
     case GitHubOperation.ISSUE_ADD_LABELS: {
-      const labels = config.labels ? JSON.parse(config.labels) : [];
+      const labels = config.labels ? safeParseJson(config.labels, 'labels') : [];
       const data = await client.request(
         `/repos/${owner}/${repo}/issues/${issueNumber}/labels`,
         { method: "POST", body: { labels } }
@@ -156,7 +181,7 @@ export async function executeIssuesPrsOperations(
     }
 
     case GitHubOperation.ISSUE_ASSIGN: {
-      const assignees = config.assignees ? JSON.parse(config.assignees) : [];
+      const assignees = config.assignees ? safeParseJson(config.assignees, 'assignees') : [];
       return client.request(
         `/repos/${owner}/${repo}/issues/${issueNumber}/assignees`,
         { method: "POST", body: { assignees } }
@@ -164,7 +189,7 @@ export async function executeIssuesPrsOperations(
     }
 
     case GitHubOperation.ISSUE_UNASSIGN: {
-      const assignees = config.assignees ? JSON.parse(config.assignees) : [];
+      const assignees = config.assignees ? safeParseJson(config.assignees, 'assignees') : [];
       return client.request(
         `/repos/${owner}/${repo}/issues/${issueNumber}/assignees`,
         { method: "DELETE", body: { assignees } }

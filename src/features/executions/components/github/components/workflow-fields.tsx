@@ -2,6 +2,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { GitHubConfig } from "../types"
+import { useEffect, useState } from "react"
 
 interface WorkflowFieldsProps {
   values: Partial<GitHubConfig>
@@ -10,6 +11,13 @@ interface WorkflowFieldsProps {
 
 export function WorkflowFields({ values, setValues }: WorkflowFieldsProps) {
   const op = values.operation || ""
+  const [optionsText, setOptionsText] = useState(
+    JSON.stringify(values.options || {}, null, 2)
+  )
+
+  useEffect(() => {
+    setOptionsText(JSON.stringify(values.options || {}, null, 2))
+  }, [values.options])
   const isWorkflow = op.startsWith("WORKFLOW_")
   const isDeployment = op.startsWith("DEPLOYMENT_")
   const isAgentTask = op.startsWith("AGENT_TASK_")
@@ -173,10 +181,12 @@ export function WorkflowFields({ values, setValues }: WorkflowFieldsProps) {
           <Label>Advanced Options (JSON)</Label>
           <Textarea
             placeholder='{"environment": "production"}'
-            value={typeof values.options === "object" ? JSON.stringify(values.options, null, 2) : "{}"}
+            value={optionsText}
             onChange={(e) => {
+              setOptionsText(e.target.value)
               try {
-                setValues({ ...values, options: JSON.parse(e.target.value) })
+                const parsed = JSON.parse(e.target.value)
+                setValues({ ...values, options: parsed })
               } catch {
                 // Allow invalid JSON while typing
               }

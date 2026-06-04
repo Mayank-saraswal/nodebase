@@ -3,6 +3,7 @@ import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import prisma from "@/lib/db";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
+import { encryptWebhookSecret } from "@/lib/webhook-secret";
 
 const upsertTriggerInput = z.object({
   nodeId: z.string(),
@@ -43,14 +44,20 @@ export const githubTriggerRouter = createTRPCRouter({
     });
 
     const webhookId = existingNode?.webhookId || crypto.randomUUID();
-    const webhookSecret = existingNode?.webhookSecret || crypto.randomBytes(32).toString("hex");
+
+    // Generate and encrypt new secret if none exists
+    let webhookSecretEncrypted = existingNode?.webhookSecretEncrypted;
+    if (!webhookSecretEncrypted) {
+      const plainSecret = crypto.randomBytes(32).toString("hex");
+      webhookSecretEncrypted = encryptWebhookSecret(plainSecret);
+    }
 
     const data = {
       owner: input.owner,
       repo: input.repo,
       events: input.events,
       webhookId,
-      webhookSecret,
+      webhookSecretEncrypted,
     };
 
     return prisma.gitHubTriggerNode.upsert({

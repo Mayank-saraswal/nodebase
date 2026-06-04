@@ -91,6 +91,36 @@ export function GitHubDialog({
         prerelease: nodeData.prerelease || false,
         options: nodeData.options || {},
       })
+    } else {
+      setCredentialId("")
+      setValues({
+        operation: GitHubOperation.USER_GET_CURRENT,
+        owner: "",
+        repo: "",
+        branch: "",
+        filePath: "",
+        fileContent: "",
+        commitMessage: "",
+        issueNumber: "",
+        pullNumber: "",
+        title: "",
+        body: "",
+        state: "",
+        labels: "",
+        assignees: "",
+        headBranch: "",
+        baseBranch: "",
+        workflowId_github: "",
+        eventType: "",
+        clientPayload: "",
+        searchQuery: "",
+        perPage: 30,
+        tagName: "",
+        releaseName: "",
+        draft: false,
+        prerelease: false,
+        options: {},
+      })
     }
   }, [nodeData])
 
@@ -151,9 +181,9 @@ export function GitHubDialog({
           <div className="space-y-6 py-4">
             {/* Credential */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Credential</label>
+              <label htmlFor="credential-select" className="text-sm font-medium">Credential</label>
               <Select value={credentialId} onValueChange={setCredentialId}>
-                <SelectTrigger>
+                <SelectTrigger id="credential-select">
                   <SelectValue placeholder="Select a credential" />
                 </SelectTrigger>
                 <SelectContent>
@@ -190,12 +220,12 @@ export function GitHubDialog({
 
             {/* Grouped Operation Selector */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Operation</label>
+              <label htmlFor="operation-select" className="text-sm font-medium">Operation</label>
               <Select
                 value={values.operation}
                 onValueChange={(val) => setValues({ ...values, operation: val as GitHubOperation })}
               >
-                <SelectTrigger>
+                <SelectTrigger id="operation-select">
                   <SelectValue placeholder="Select operation" />
                 </SelectTrigger>
                 <SelectContent className="max-h-80">

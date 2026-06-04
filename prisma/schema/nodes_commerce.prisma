@@ -167,7 +167,7 @@ model ShiprocketNode {
   updatedAt DateTime @updatedAt
 
   workflow   workflow    @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  credential Credential? @relation(fields: [credentialId], references: [id])
+  credential Credential? @relation(fields: [credentialId], references: [id], onDelete: SetNull)
 
   @@index([workflowId])
   @@index([nodeId])
@@ -178,7 +178,7 @@ model CashfreeNode {
   nodeId       String      @unique
   workflowId   String
   credentialId String?
-  credential   Credential? @relation(fields: [credentialId], references: [id])
+  credential   Credential? @relation(fields: [credentialId], references: [id], onDelete: SetNull)
 
   operation      CashfreeOperation @default(CREATE_ORDER)
   variableName   String            @default("cashfree")
