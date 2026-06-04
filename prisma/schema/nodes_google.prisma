@@ -102,4 +102,7 @@ model GoogleDriveNode {
   createdAt    DateTime             @default(now())
   updatedAt    DateTime             @updatedAt
   workflow     workflow             @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+  @@index([nodeId])
 }

@@ -40,6 +40,8 @@ import { filterRouter } from '@/server/routers/filter.router';
 import { cashfreeRouter } from '@/server/routers/cashfree.router';
 import { aggregateRouter } from '@/server/routers/aggregate.router';
 import { postgresRouter } from '@/server/routers/postgres.router';
+import { githubRouter } from '@/server/routers/github.router';
+import { githubTriggerRouter } from '@/server/routers/github-trigger.router';
 
 
 export const appRouter = createTRPCRouter({
@@ -78,6 +80,8 @@ export const appRouter = createTRPCRouter({
   cashfree: cashfreeRouter,
   aggregate: aggregateRouter,
   postgres: postgresRouter,
+  github: githubRouter,
+  githubTrigger: githubTriggerRouter,
 });
 // export type definition of API
 export type AppRouter = typeof appRouter;

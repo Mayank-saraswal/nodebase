@@ -141,4 +141,6 @@ model GmailWatcher {
   workflow      workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
 
   @@index([email, active])
+  @@index([workflowId])
+  @@index([nodeId])
 }

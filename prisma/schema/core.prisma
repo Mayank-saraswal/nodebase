@@ -44,6 +44,8 @@ model workflow {
   cashfreeNodes     CashfreeNode[]
   aggregateNodes    AggregateNode[]
   postgresNodes     PostgresNode[]
+  githubNodes       GitHubNode[]
+  githubTriggerNodes GitHubTriggerNode[]
   userId            String
   user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
@@ -62,6 +64,7 @@ model Credential {
   freshdeskNodes  FreshdeskNode[]
   cashfreeNodes   CashfreeNode[]
   postgresNodes   PostgresNode[]
+  githubNodes     GitHubNode[]
 
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @default(now()) @updatedAt

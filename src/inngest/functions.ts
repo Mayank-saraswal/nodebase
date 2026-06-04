@@ -43,6 +43,7 @@ import { filterChannel } from "./channels/filter";
 import { cashfreeChannel } from "./channels/cashfree";
 import { aggregateChannel } from "./channels/aggregate";
 import { postgresChannel } from "./channels/postgres";
+import { githubChannel } from "./channels/github";
 
 
 const MAX_JSON_LENGTH = 100_000;
@@ -188,6 +189,7 @@ export const executeWorkflow = inngest.createFunction(
       cashfreeChannel(),
       aggregateChannel(),
       postgresChannel(),
+      githubChannel(),
 
     ]
   },

@@ -1,6 +1,6 @@
 /** @type {import('next-sitemap').IConfig} */
 module.exports = {
-  siteUrl: "https://nodebase.tech",
+  siteUrl: "https://nodebase.mayanksaraswal.in",
   generateRobotsTxt: true,
   generateIndexSitemap: false,
   changefreq: "weekly",

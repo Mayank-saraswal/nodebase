@@ -1,12 +1,12 @@
 /**
- * scripts/migrate-webhook-secrets.ts
+ * scripts/migrate-github-secrets.ts
  *
- * One-time data migration: encrypts all plaintext secretTokenLegacy values
- * in WebhookTrigger and stores them in secretTokenEncrypted.
+ * One-time data migration: encrypts all plaintext webhookSecret values
+ * in GitHubTriggerNode and stores them in webhookSecretEncrypted.
  *
- * Run: npm run migrate:webhook-secrets
+ * Run: npm run migrate:github-secrets
  *
- * Safe to re-run — skips rows that already have secretTokenEncrypted set.
+ * Safe to re-run — skips rows that already have webhookSecretEncrypted set.
  */
 import { PrismaClient } from "../src/generated/prisma"
 import { encrypt } from "../src/lib/encryption"
@@ -14,14 +14,14 @@ import { encrypt } from "../src/lib/encryption"
 const prisma = new PrismaClient()
 
 async function main() {
-  const triggers = await prisma.webhookTrigger.findMany({
+  const triggers = await prisma.gitHubTriggerNode.findMany({
     where: {
-      secretTokenEncrypted: null,
-      secretTokenLegacy: { not: null },
+      webhookSecretEncrypted: null,
+      webhookSecret: { not: null },
     },
   })
 
-  console.log(`Found ${triggers.length} trigger(s) to migrate`)
+  console.log(`Found ${triggers.length} GitHub trigger(s) to migrate`)
 
   let migrated = 0
   let skipped = 0
@@ -29,23 +29,23 @@ async function main() {
 
   for (const trigger of triggers) {
     try {
-      if (!trigger.secretTokenLegacy) {
+      if (!trigger.webhookSecret) {
         skipped++
         continue
       }
 
-      const encrypted = encrypt(trigger.secretTokenLegacy)
+      const encrypted = encrypt(trigger.webhookSecret)
 
       // Use updateMany with conditional where to prevent race conditions:
-      // only update if secretTokenEncrypted is still null
-      const result = await prisma.webhookTrigger.updateMany({
+      // only update if webhookSecretEncrypted is still null
+      const result = await prisma.gitHubTriggerNode.updateMany({
         where: {
           id: trigger.id,
-          secretTokenEncrypted: null,
+          webhookSecretEncrypted: null,
         },
         data: {
-          secretTokenEncrypted: encrypted,
-          secretTokenLegacy: null, // clear legacy plaintext
+          webhookSecretEncrypted: encrypted,
+          webhookSecret: null,
         },
       })
 
@@ -63,7 +63,7 @@ async function main() {
   }
 
   console.log(
-    `\nMigration complete: ${migrated} migrated, ${skipped} skipped (empty secret), ${failed} failed`
+    `\nMigration complete: ${migrated} migrated, ${skipped} skipped, ${failed} failed`
   )
 
   if (failed > 0) {
