@@ -29,33 +29,33 @@ model workflow {
   switchNodes       SwitchNode[]
   waitNodes         WaitNode[]
   mergeNodes        MergeNode[]
-  errorTriggerNodes  ErrorTriggerNode[]
-  razorpayTriggers   RazorpayTrigger[]
-  whatsappTriggers   WhatsAppTrigger[]
-  msg91Nodes         Msg91Node[]
-  shiprocketNodes    ShiprocketNode[]
-  zohoCrmNodes       ZohoCrmNode[]
-  hubspotNodes       HubspotNode[]
-  freshdeskNodes     FreshdeskNode[]
-  aiNodes            AINode[]
-  mediaUploadNodes   MediaUploadNode[]
-  sortNodes          SortNode[]
-  filterNodes        FilterNode[]
-  cashfreeNodes      CashfreeNode[]
-  aggregateNodes     AggregateNode[]
-  postgresNodes      PostgresNode[]
+  errorTriggerNodes ErrorTriggerNode[]
+  razorpayTriggers  RazorpayTrigger[]
+  whatsappTriggers  WhatsAppTrigger[]
+  msg91Nodes        Msg91Node[]
+  shiprocketNodes   ShiprocketNode[]
+  zohoCrmNodes      ZohoCrmNode[]
+  hubspotNodes      HubspotNode[]
+  freshdeskNodes    FreshdeskNode[]
+  aiNodes           AINode[]
+  mediaUploadNodes  MediaUploadNode[]
+  sortNodes         SortNode[]
+  filterNodes       FilterNode[]
+  cashfreeNodes     CashfreeNode[]
+  aggregateNodes    AggregateNode[]
+  postgresNodes     PostgresNode[]
   userId            String
   user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Credential {
-  id     String         @id @default(cuid())
-  name   String
-  value  String
-  userId String
-  type   CredentialType
-  user   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  Node   Node[]
+  id              String           @id @default(cuid())
+  name            String
+  value           String
+  userId          String
+  type            CredentialType
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Node            Node[]
   shiprocketNodes ShiprocketNode[]
   zohoCrmNodes    ZohoCrmNode[]
   hubspotNodes    HubspotNode[]
@@ -63,13 +63,23 @@ model Credential {
   cashfreeNodes   CashfreeNode[]
   postgresNodes   PostgresNode[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now()) @updatedAt
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @default(now()) @updatedAt
+  razorpayNodes     RazorpayNode[]
+  gmailNodes        GmailNode[]
+  googleSheetsNodes GoogleSheetsNode[]
+  googleDriveNodes  GoogleDriveNode[]
+  slackNodes        SlackNode[]
+  whatsAppNodes     WhatsAppNode[]
+  notionNodes       NotionNode[]
+  msg91Nodes        Msg91Node[]
+  ainodes           AINode[]
+  mediaUploadNodes  MediaUploadNode[]
 
   // TODO: @@map("Credenial") has a typo — should be "credential"
   // Fixing requires: ALTER TABLE "Credenial" RENAME TO "credential";
   // plus updating all existing FK references. Do in a dedicated migration sprint.
-  @@map("Credenial")
+  @@map("credential")
 }
 
 model Node {
@@ -120,26 +130,26 @@ model Execution {
 }
 
 model NodeExecution {
-  id             String    @id @default(cuid())
-  executionId    String
-  execution      Execution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  id          String    @id @default(cuid())
+  executionId String
+  execution   Execution @relation(fields: [executionId], references: [id], onDelete: Cascade)
 
-  nodeId         String
-  nodeName       String    @default("")
-  nodeType       String    @default("")
+  nodeId   String
+  nodeName String @default("")
+  nodeType String @default("")
 
-  status         String    @default("success")
+  status String @default("success")
 
-  inputJson      String    @default("") @db.Text
-  outputJson     String    @default("") @db.Text
+  inputJson  String @default("") @db.Text
+  outputJson String @default("") @db.Text
 
-  errorMessage   String    @default("")
+  errorMessage String @default("")
 
-  durationMs     Int       @default(0)
+  durationMs Int @default(0)
 
-  executionOrder Int       @default(0)
+  executionOrder Int @default(0)
 
-  createdAt      DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([executionId])
   @@index([nodeId])

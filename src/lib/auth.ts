@@ -38,6 +38,6 @@ import prisma from "./db"
    }
  },
  plugins:[],
- baseURL: process.env.BETTER_AUTH_URL,
+ baseURL: process.env.BETTER_AUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "https://nodebase.mayanksaraswal.in",
  secret: process.env.BETTER_AUTH_SECRET
 });

@@ -4,62 +4,63 @@
 // ─────────────────────────────────────────────────────────────
 
 model RazorpayNode {
-  id                String             @id @default(cuid())
-  nodeId            String             @unique
+  id                String            @id @default(cuid())
+  nodeId            String            @unique
   workflowId        String
   credentialId      String?
-  operation         RazorpayOperation  @default(ORDER_CREATE)
-  variableName      String             @default("razorpay")
-  amount            String             @default("")
-  currency          String             @default("INR")
-  description       String             @default("")
-  receipt           String             @default("")
-  notes             String             @default("")
-  partialPayment    Boolean            @default(false)
-  orderId           String             @default("")
-  paymentId         String             @default("")
-  captureAmount     String             @default("")
-  refundAmount      String             @default("")
-  refundSpeed       String             @default("normal")
-  refundId          String             @default("")
-  customerId        String             @default("")
-  customerName      String             @default("")
-  customerEmail     String             @default("")
-  customerContact   String             @default("")
-  failExisting      Boolean            @default(false)
-  planId            String             @default("")
-  totalCount        String             @default("")
-  quantity          String             @default("1")
-  startAt           String             @default("")
-  subscriptionId    String             @default("")
-  cancelAtCycleEnd  Boolean            @default(false)
-  invoiceType       String             @default("invoice")
-  lineItems         String             @default("")
-  expireBy          String             @default("")
-  smsNotify         Boolean            @default(true)
-  emailNotify       Boolean            @default(true)
-  invoiceId         String             @default("")
-  paymentLinkId     String             @default("")
-  referenceId       String             @default("")
-  reminderEnable    Boolean            @default(true)
-  callbackUrl       String             @default("")
-  callbackMethod    String             @default("")
-  accountNumber     String             @default("")
-  fundAccountId     String             @default("")
-  payoutMode        String             @default("")
-  payoutPurpose     String             @default("payout")
-  narration         String             @default("")
+  credential        Credential?       @relation(fields: [credentialId], references: [id], onDelete: SetNull)
+  operation         RazorpayOperation @default(ORDER_CREATE)
+  variableName      String            @default("razorpay")
+  amount            String            @default("")
+  currency          String            @default("INR")
+  description       String            @default("")
+  receipt           String            @default("")
+  notes             String            @default("")
+  partialPayment    Boolean           @default(false)
+  orderId           String            @default("")
+  paymentId         String            @default("")
+  captureAmount     String            @default("")
+  refundAmount      String            @default("")
+  refundSpeed       String            @default("normal")
+  refundId          String            @default("")
+  customerId        String            @default("")
+  customerName      String            @default("")
+  customerEmail     String            @default("")
+  customerContact   String            @default("")
+  failExisting      Boolean           @default(false)
+  planId            String            @default("")
+  totalCount        String            @default("")
+  quantity          String            @default("1")
+  startAt           String            @default("")
+  subscriptionId    String            @default("")
+  cancelAtCycleEnd  Boolean           @default(false)
+  invoiceType       String            @default("invoice")
+  lineItems         String            @default("")
+  expireBy          String            @default("")
+  smsNotify         Boolean           @default(true)
+  emailNotify       Boolean           @default(true)
+  invoiceId         String            @default("")
+  paymentLinkId     String            @default("")
+  referenceId       String            @default("")
+  reminderEnable    Boolean           @default(true)
+  callbackUrl       String            @default("")
+  callbackMethod    String            @default("")
+  accountNumber     String            @default("")
+  fundAccountId     String            @default("")
+  payoutMode        String            @default("")
+  payoutPurpose     String            @default("payout")
+  narration         String            @default("")
   queueIfLowBalance Boolean           @default(false)
-  payoutId          String             @default("")
-  signature         String             @default("")
-  throwOnInvalid    Boolean            @default(true)
-  count             String             @default("")
-  skip              String             @default("")
-  fromDate          String             @default("")
-  toDate            String             @default("")
-  authorized        String             @default("")
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
+  payoutId          String            @default("")
+  signature         String            @default("")
+  throwOnInvalid    Boolean           @default(true)
+  count             String            @default("")
+  skip              String            @default("")
+  fromDate          String            @default("")
+  toDate            String            @default("")
+  authorized        String            @default("")
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
 
   workflow workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
 
@@ -68,8 +69,8 @@ model RazorpayNode {
 }
 
 model ShiprocketNode {
-  id           String              @id @default(cuid())
-  nodeId       String              @unique
+  id           String  @id @default(cuid())
+  nodeId       String  @unique
   workflowId   String
   credentialId String?
 
@@ -77,216 +78,216 @@ model ShiprocketNode {
   variableName String              @default("shiprocket")
 
   // ── ORDER fields ──────────────────────────────────────────────────
-  orderId            String @default("") @db.Text
-  orderDate          String @default("")
-  channelId          String @default("")
+  orderId   String @default("") @db.Text
+  orderDate String @default("")
+  channelId String @default("")
 
-  billingName        String @default("") @db.Text
-  billingAddress     String @default("") @db.Text
-  billingAddress2    String @default("") @db.Text
-  billingCity        String @default("") @db.Text
-  billingState       String @default("") @db.Text
-  billingCountry     String @default("India")
-  billingPincode     String @default("") @db.Text
-  billingEmail       String @default("") @db.Text
-  billingPhone       String @default("") @db.Text
+  billingName           String @default("") @db.Text
+  billingAddress        String @default("") @db.Text
+  billingAddress2       String @default("") @db.Text
+  billingCity           String @default("") @db.Text
+  billingState          String @default("") @db.Text
+  billingCountry        String @default("India")
+  billingPincode        String @default("") @db.Text
+  billingEmail          String @default("") @db.Text
+  billingPhone          String @default("") @db.Text
   billingAlternatePhone String @default("") @db.Text
 
-  shippingIsBilling   Boolean @default(true)
-  shippingName        String @default("") @db.Text
-  shippingAddress     String @default("") @db.Text
-  shippingAddress2    String @default("") @db.Text
-  shippingCity        String @default("") @db.Text
-  shippingState       String @default("") @db.Text
-  shippingCountry     String @default("India")
-  shippingPincode     String @default("") @db.Text
-  shippingEmail       String @default("") @db.Text
-  shippingPhone       String @default("") @db.Text
+  shippingIsBilling Boolean @default(true)
+  shippingName      String  @default("") @db.Text
+  shippingAddress   String  @default("") @db.Text
+  shippingAddress2  String  @default("") @db.Text
+  shippingCity      String  @default("") @db.Text
+  shippingState     String  @default("") @db.Text
+  shippingCountry   String  @default("India")
+  shippingPincode   String  @default("") @db.Text
+  shippingEmail     String  @default("") @db.Text
+  shippingPhone     String  @default("") @db.Text
 
-  orderItems         String @default("[]") @db.Text
+  orderItems String @default("[]") @db.Text
 
-  paymentMethod      String @default("prepaid")
-  subTotal           String @default("") @db.Text
-  codAmount          String @default("0")
+  paymentMethod String @default("prepaid")
+  subTotal      String @default("") @db.Text
+  codAmount     String @default("0")
 
-  length             String @default("") @db.Text
-  breadth            String @default("") @db.Text
-  height             String @default("") @db.Text
-  weight             String @default("") @db.Text
+  length  String @default("") @db.Text
+  breadth String @default("") @db.Text
+  height  String @default("") @db.Text
+  weight  String @default("") @db.Text
 
-  shiprocketOrderId  String @default("") @db.Text
-  shipmentId         String @default("") @db.Text
-  awbCode            String @default("") @db.Text
+  shiprocketOrderId String @default("") @db.Text
+  shipmentId        String @default("") @db.Text
+  awbCode           String @default("") @db.Text
 
-  courierId          String @default("") @db.Text
-  courierName        String @default("") @db.Text
+  courierId   String @default("") @db.Text
+  courierName String @default("") @db.Text
 
   // ── PICKUP ────────────────────────────────────────────────────────
-  pickupLocation     String @default("") @db.Text
+  pickupLocation String @default("") @db.Text
 
   // ── RATE/SERVICEABILITY ───────────────────────────────────────────
-  pickupPostcode     String @default("") @db.Text
-  deliveryPostcode   String @default("") @db.Text
-  cod                String @default("0")
+  pickupPostcode   String @default("") @db.Text
+  deliveryPostcode String @default("") @db.Text
+  cod              String @default("0")
 
   // ── RETURN ───────────────────────────────────────────────────────
-  returnOrderId      String @default("") @db.Text
-  returnReason       String @default("") @db.Text
+  returnOrderId        String @default("") @db.Text
+  returnReason         String @default("") @db.Text
   returnPickupLocation String @default("") @db.Text
 
   // ── PRODUCT ──────────────────────────────────────────────────────
-  productName        String @default("") @db.Text
-  productSku         String @default("") @db.Text
-  productMrp         String @default("") @db.Text
+  productName         String @default("") @db.Text
+  productSku          String @default("") @db.Text
+  productMrp          String @default("") @db.Text
   productSellingPrice String @default("") @db.Text
-  productWeight      String @default("") @db.Text
-  productCategory    String @default("") @db.Text
-  productHsn         String @default("") @db.Text
+  productWeight       String @default("") @db.Text
+  productCategory     String @default("") @db.Text
+  productHsn          String @default("") @db.Text
 
   // ── LIST filters ─────────────────────────────────────────────────
-  filterStatus       String @default("") @db.Text
-  pageNo             Int    @default(1)
-  perPage            Int    @default(10)
+  filterStatus String @default("") @db.Text
+  pageNo       Int    @default(1)
+  perPage      Int    @default(10)
 
   // ── WAREHOUSE ────────────────────────────────────────────────────
-  warehouseName      String @default("") @db.Text
-  warehouseEmail     String @default("") @db.Text
-  warehousePhone     String @default("") @db.Text
-  warehouseAddress   String @default("") @db.Text
-  warehouseCity      String @default("") @db.Text
-  warehouseState     String @default("") @db.Text
-  warehousePincode   String @default("") @db.Text
-  warehouseCountry   String @default("India")
+  warehouseName    String @default("") @db.Text
+  warehouseEmail   String @default("") @db.Text
+  warehousePhone   String @default("") @db.Text
+  warehouseAddress String @default("") @db.Text
+  warehouseCity    String @default("") @db.Text
+  warehouseState   String @default("") @db.Text
+  warehousePincode String @default("") @db.Text
+  warehouseCountry String @default("India")
 
-  cancelReason       String @default("") @db.Text
+  cancelReason String @default("") @db.Text
 
-  continueOnFail     Boolean @default(false)
+  continueOnFail Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  workflow     workflow    @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  credential   Credential? @relation(fields: [credentialId], references: [id])
+  workflow   workflow    @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  credential Credential? @relation(fields: [credentialId], references: [id])
 
   @@index([workflowId])
   @@index([nodeId])
 }
 
 model CashfreeNode {
-  id           String             @id @default(cuid())
-  nodeId       String             @unique
+  id           String      @id @default(cuid())
+  nodeId       String      @unique
   workflowId   String
   credentialId String?
-  credential   Credential?        @relation(fields: [credentialId], references: [id])
+  credential   Credential? @relation(fields: [credentialId], references: [id])
 
-  operation    CashfreeOperation  @default(CREATE_ORDER)
-  variableName String             @default("cashfree")
-  continueOnFail Boolean          @default(false)
+  operation      CashfreeOperation @default(CREATE_ORDER)
+  variableName   String            @default("cashfree")
+  continueOnFail Boolean           @default(false)
 
   // ── ORDER FIELDS ──────────────────────────────────────────
-  orderId           String         @default("") @db.Text
-  orderAmount       String         @default("") @db.Text
-  orderCurrency     String         @default("INR")
-  orderNote         String         @default("") @db.Text
-  orderMeta         String         @default("{}") @db.Text
+  orderId       String @default("") @db.Text
+  orderAmount   String @default("") @db.Text
+  orderCurrency String @default("INR")
+  orderNote     String @default("") @db.Text
+  orderMeta     String @default("{}") @db.Text
 
   // ── CUSTOMER FIELDS ───────────────────────────────────────
-  customerId        String         @default("") @db.Text
-  customerEmail     String         @default("") @db.Text
-  customerPhone     String         @default("") @db.Text
-  customerName      String         @default("") @db.Text
-  customerBankAccountNumber String  @default("") @db.Text
-  customerBankIfsc  String         @default("") @db.Text
-  customerBankCode  String         @default("")
+  customerId                String @default("") @db.Text
+  customerEmail             String @default("") @db.Text
+  customerPhone             String @default("") @db.Text
+  customerName              String @default("") @db.Text
+  customerBankAccountNumber String @default("") @db.Text
+  customerBankIfsc          String @default("") @db.Text
+  customerBankCode          String @default("")
 
   // ── PAYMENT FIELDS ────────────────────────────────────────
-  cfPaymentId       String         @default("") @db.Text
-  cfOrderId         String         @default("") @db.Text
-  paymentMethod     String         @default("") @db.Text
+  cfPaymentId   String @default("") @db.Text
+  cfOrderId     String @default("") @db.Text
+  paymentMethod String @default("") @db.Text
 
   // ── REFUND FIELDS ─────────────────────────────────────────
-  refundId          String         @default("") @db.Text
-  refundAmount      String         @default("") @db.Text
-  refundNote        String         @default("") @db.Text
-  refundSpeed       String         @default("STANDARD")
-  refundSplits      String         @default("[]") @db.Text
+  refundId     String @default("") @db.Text
+  refundAmount String @default("") @db.Text
+  refundNote   String @default("") @db.Text
+  refundSpeed  String @default("STANDARD")
+  refundSplits String @default("[]") @db.Text
 
   // ── SETTLEMENT FIELDS ─────────────────────────────────────
-  settlementId      String         @default("") @db.Text
-  startDate         String         @default("") @db.Text
-  endDate           String         @default("") @db.Text
-  cursor            String         @default("")
-  limit             Int            @default(10)
+  settlementId String @default("") @db.Text
+  startDate    String @default("") @db.Text
+  endDate      String @default("") @db.Text
+  cursor       String @default("")
+  limit        Int    @default(10)
 
   // ── PAYMENT LINK FIELDS ───────────────────────────────────
-  linkId            String         @default("") @db.Text
-  linkAmount        String         @default("") @db.Text
-  linkCurrency      String         @default("INR")
-  linkPurpose       String         @default("") @db.Text
-  linkDescription   String         @default("") @db.Text
-  linkExpiryTime    String         @default("") @db.Text
-  linkNotifyPhone   Boolean        @default(true)
-  linkNotifyEmail   Boolean        @default(true)
-  linkAutoReminders Boolean        @default(true)
-  linkMinPartialAmount String      @default("") @db.Text
-  linkMeta          String         @default("{}") @db.Text
+  linkId               String  @default("") @db.Text
+  linkAmount           String  @default("") @db.Text
+  linkCurrency         String  @default("INR")
+  linkPurpose          String  @default("") @db.Text
+  linkDescription      String  @default("") @db.Text
+  linkExpiryTime       String  @default("") @db.Text
+  linkNotifyPhone      Boolean @default(true)
+  linkNotifyEmail      Boolean @default(true)
+  linkAutoReminders    Boolean @default(true)
+  linkMinPartialAmount String  @default("") @db.Text
+  linkMeta             String  @default("{}") @db.Text
 
   // ── SUBSCRIPTION FIELDS ───────────────────────────────────
-  subscriptionId    String         @default("") @db.Text
-  planId            String         @default("") @db.Text
-  planName          String         @default("") @db.Text
-  planType          String         @default("PERIODIC")
-  planIntervalType  String         @default("MONTH")
-  planIntervals     Int            @default(1)
-  planMaxCycles     Int            @default(0)
-  planMaxAmount     String         @default("") @db.Text
+  subscriptionId              String @default("") @db.Text
+  planId                      String @default("") @db.Text
+  planName                    String @default("") @db.Text
+  planType                    String @default("PERIODIC")
+  planIntervalType            String @default("MONTH")
+  planIntervals               Int    @default(1)
+  planMaxCycles               Int    @default(0)
+  planMaxAmount               String @default("") @db.Text
   subscriptionFirstChargeTime String @default("") @db.Text
-  subscriptionExpiryTime String    @default("") @db.Text
-  subscriptionReturnUrl String     @default("") @db.Text
-  subscriptionNotifyUrl String     @default("") @db.Text
-  subscriptionAction  String       @default("PAUSE")
+  subscriptionExpiryTime      String @default("") @db.Text
+  subscriptionReturnUrl       String @default("") @db.Text
+  subscriptionNotifyUrl       String @default("") @db.Text
+  subscriptionAction          String @default("PAUSE")
 
   // ── PAYOUT FIELDS ─────────────────────────────────────────
-  beneId            String         @default("") @db.Text
-  beneName          String         @default("") @db.Text
-  beneEmail         String         @default("") @db.Text
-  benePhone         String         @default("") @db.Text
-  beneBankAccount   String         @default("") @db.Text
-  beneBankIfsc      String         @default("") @db.Text
-  beneVpa           String         @default("") @db.Text
-  beneAddress       String         @default("") @db.Text
-  beneCity          String         @default("") @db.Text
-  beneState         String         @default("India")
-  benePincode       String         @default("") @db.Text
+  beneId          String @default("") @db.Text
+  beneName        String @default("") @db.Text
+  beneEmail       String @default("") @db.Text
+  benePhone       String @default("") @db.Text
+  beneBankAccount String @default("") @db.Text
+  beneBankIfsc    String @default("") @db.Text
+  beneVpa         String @default("") @db.Text
+  beneAddress     String @default("") @db.Text
+  beneCity        String @default("") @db.Text
+  beneState       String @default("India")
+  benePincode     String @default("") @db.Text
 
-  transferId        String         @default("") @db.Text
-  transferAmount    String         @default("") @db.Text
-  transferRemarks   String         @default("") @db.Text
-  transferMode      String         @default("banktransfer")
-  batchTransferId   String         @default("") @db.Text
-  batchEntries      String         @default("[]") @db.Text
+  transferId      String @default("") @db.Text
+  transferAmount  String @default("") @db.Text
+  transferRemarks String @default("") @db.Text
+  transferMode    String @default("banktransfer")
+  batchTransferId String @default("") @db.Text
+  batchEntries    String @default("[]") @db.Text
 
   // ── UPI FIELDS ────────────────────────────────────────────
-  upiVpa            String         @default("") @db.Text
-  upiAmount         String         @default("") @db.Text
-  upiDescription    String         @default("") @db.Text
+  upiVpa         String @default("") @db.Text
+  upiAmount      String @default("") @db.Text
+  upiDescription String @default("") @db.Text
 
   // ── OFFER FIELDS ──────────────────────────────────────────
-  offerId           String         @default("") @db.Text
-  offerMeta         String         @default("{}") @db.Text
-  offerValidations  String         @default("{}") @db.Text
-  offerDetails      String         @default("{}") @db.Text
+  offerId          String @default("") @db.Text
+  offerMeta        String @default("{}") @db.Text
+  offerValidations String @default("{}") @db.Text
+  offerDetails     String @default("{}") @db.Text
 
   // ── WEBHOOK FIELDS ────────────────────────────────────────
-  webhookSignature  String         @default("") @db.Text
-  webhookTimestamp  String         @default("") @db.Text
-  webhookRawBody    String         @default("") @db.Text
-  webhookThrowOnFail Boolean       @default(true)
+  webhookSignature   String  @default("") @db.Text
+  webhookTimestamp   String  @default("") @db.Text
+  webhookRawBody     String  @default("") @db.Text
+  webhookThrowOnFail Boolean @default(true)
 
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  workflow     workflow           @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  workflow workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
 
   @@index([workflowId])
   @@index([nodeId])

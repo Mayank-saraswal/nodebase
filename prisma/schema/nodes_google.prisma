@@ -4,10 +4,11 @@
 // ─────────────────────────────────────────────────────────────
 
 model GmailNode {
-  id           String         @id @default(cuid())
+  id           String      @id @default(cuid())
   workflowId   String
-  nodeId       String         @unique
-  credentialId String
+  nodeId       String      @unique
+  credentialId String?
+  credential   Credential? @relation(fields: [credentialId], references: [id], onDelete: SetNull)
 
   operation    GmailOperation @default(SEND)
   variableName String         @default("gmail")
@@ -19,20 +20,20 @@ model GmailNode {
   isHtml  Boolean @default(false)
 
   // New fields for extended operations
-  cc              String   @default("")
-  bcc             String   @default("")
-  replyTo         String   @default("")
-  messageId       String   @default("")
-  threadId        String   @default("")
-  searchQuery     String   @default("")
-  maxResults      Int      @default(10)
-  labelIds        String   @default("")
-  includeBody     Boolean  @default(true)
-  includeHeaders  Boolean  @default(false)
-  pageToken       String   @default("")
-  attachmentData  String   @default("") @db.Text
-  attachmentName  String   @default("")
-  attachmentMime  String   @default("application/octet-stream")
+  cc             String  @default("")
+  bcc            String  @default("")
+  replyTo        String  @default("")
+  messageId      String  @default("")
+  threadId       String  @default("")
+  searchQuery    String  @default("")
+  maxResults     Int     @default(10)
+  labelIds       String  @default("")
+  includeBody    Boolean @default(true)
+  includeHeaders Boolean @default(false)
+  pageToken      String  @default("")
+  attachmentData String  @default("") @db.Text
+  attachmentName String  @default("")
+  attachmentMime String  @default("application/octet-stream")
 
   // New fields for extended operations
   attachmentId           String @default("")
@@ -60,7 +61,8 @@ model GoogleSheetsNode {
   sheetName        String         @default("Sheet1")
   range            String         @default("A:Z")
   rowData          Json           @default("[]")
-  credentialId     String         @default("")
+  credentialId     String?
+  credential       Credential?    @relation(fields: [credentialId], references: [id], onDelete: SetNull)
   variableName     String         @default("googleSheets")
   headerRow        Boolean        @default(true)
   rowNumber        String         @default("")
@@ -89,6 +91,7 @@ model GoogleDriveNode {
   nodeId       String               @unique
   workflowId   String
   credentialId String?
+  credential   Credential?          @relation(fields: [credentialId], references: [id], onDelete: SetNull)
   operation    GoogleDriveOperation @default(UPLOAD_FILE)
   folderId     String?
   fileId       String?
@@ -98,5 +101,5 @@ model GoogleDriveNode {
   maxResults   Int                  @default(10)
   createdAt    DateTime             @default(now())
   updatedAt    DateTime             @updatedAt
-  workflow     workflow             @relation(fields: [workflowId], references: [id])
+  workflow     workflow             @relation(fields: [workflowId], references: [id], onDelete: Cascade)
 }

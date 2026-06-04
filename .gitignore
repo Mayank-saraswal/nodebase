@@ -54,3 +54,4 @@ scripts/set-azure-env-vars.sh
 NODEBASE_CONTEXT.md
 tsc-errors.txt
 *.tsc-errors.txt
+github-node.md

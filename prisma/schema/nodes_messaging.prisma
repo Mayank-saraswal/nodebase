@@ -4,45 +4,46 @@
 // ─────────────────────────────────────────────────────────────
 
 model SlackNode {
-  id               String         @id @default(cuid())
-  nodeId           String         @unique
-  workflowId       String
-  credentialId     String?
-  operation        SlackOperation @default(MESSAGE_SEND_WEBHOOK)
-  variableName     String         @default("slack")
-  channel          String         @default("")
-  message          String         @default("") @db.Text
-  threadTs         String         @default("")
-  messageTs        String         @default("")
-  searchQuery      String         @default("")
-  channelName      String         @default("")
-  channelTopic     String         @default("")
-  channelPurpose   String         @default("")
-  userId           String         @default("")
-  emoji            String         @default("")
-  fileComment      String         @default("")
-  webhookUrl       String         @default("")
-  blockKit         String         @default("") @db.Text
-  botName          String         @default("")
-  iconEmoji        String         @default("")
-  unfurlLinks      Boolean        @default(true)
-  channelTypes     String         @default("public_channel,private_channel")
-  limit            Int            @default(100)
-  excludeArchived  Boolean        @default(true)
-  isPrivate        Boolean        @default(false)
-  filename         String         @default("")
-  fileType         String         @default("")
-  title            String         @default("")
-  initialComment   String         @default("")
-  email            String         @default("")
-  statusText       String         @default("")
-  statusEmoji      String         @default("")
-  statusExpiration String         @default("")
-  sendAt           String         @default("")
-  content          String         @default("") @db.Text
-  fileId           String         @default("")
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  id             String         @id @default(cuid())
+  nodeId         String         @unique
+  workflowId     String
+  credentialId   String?
+  credential     Credential?    @relation(fields: [credentialId], references: [id], onDelete: SetNull)
+  operation      SlackOperation @default(MESSAGE_SEND_WEBHOOK)
+  variableName   String         @default("slack")
+  channel        String         @default("")
+  message        String         @default("") @db.Text
+  threadTs       String         @default("")
+  messageTs      String         @default("")
+  searchQuery    String         @default("")
+  channelName    String         @default("")
+  channelTopic   String         @default("")
+  channelPurpose String         @default("")
+  userId         String         @default("")
+  emoji          String         @default("")
+  fileComment    String         @default("")
+
+  blockKit         String   @default("") @db.Text
+  botName          String   @default("")
+  iconEmoji        String   @default("")
+  unfurlLinks      Boolean  @default(true)
+  channelTypes     String   @default("public_channel,private_channel")
+  limit            Int      @default(100)
+  excludeArchived  Boolean  @default(true)
+  isPrivate        Boolean  @default(false)
+  filename         String   @default("")
+  fileType         String   @default("")
+  title            String   @default("")
+  initialComment   String   @default("")
+  email            String   @default("")
+  statusText       String   @default("")
+  statusEmoji      String   @default("")
+  statusExpiration String   @default("")
+  sendAt           String   @default("")
+  content          String   @default("") @db.Text
+  fileId           String   @default("")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   workflow workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
 
@@ -55,6 +56,7 @@ model WhatsAppNode {
   nodeId         String            @unique
   workflowId     String
   credentialId   String?
+  credential     Credential?       @relation(fields: [credentialId], references: [id], onDelete: SetNull)
   operation      WhatsAppOperation @default(SEND_TEXT)
   to             String            @default("")
   body           String            @default("") @db.Text
@@ -67,7 +69,7 @@ model WhatsAppNode {
   reactionMsgId  String            @default("")
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
-  workflow       workflow          @relation(fields: [workflowId], references: [id])
+  workflow       workflow          @relation(fields: [workflowId], references: [id], onDelete: Cascade)
 }
 
 model NotionNode {
@@ -75,6 +77,7 @@ model NotionNode {
   nodeId         String          @unique
   workflowId     String
   credentialId   String?
+  credential     Credential?     @relation(fields: [credentialId], references: [id], onDelete: SetNull)
   operation      NotionOperation @default(QUERY_DATABASE)
   databaseId     String          @default("")
   pageId         String          @default("")
@@ -96,56 +99,57 @@ model NotionNode {
 }
 
 model Msg91Node {
-  id           String         @id @default(cuid())
-  nodeId       String         @unique
+  id           String      @id @default(cuid())
+  nodeId       String      @unique
   workflowId   String
   credentialId String?
+  credential   Credential? @relation(fields: [credentialId], references: [id], onDelete: SetNull)
 
   operation    Msg91Operation @default(SEND_OTP)
   variableName String         @default("msg91")
 
-  mobile       String   @default("") @db.Text
-  senderId     String   @default("")
-  flowId       String   @default("")
-  smsVariables String   @default("{}") @db.Text
-  message      String   @default("") @db.Text
-  route        String   @default("4")
+  mobile       String @default("") @db.Text
+  senderId     String @default("")
+  flowId       String @default("")
+  smsVariables String @default("{}") @db.Text
+  message      String @default("") @db.Text
+  route        String @default("4")
 
-  bulkData     String   @default("[]") @db.Text
+  bulkData String @default("[]") @db.Text
 
-  scheduleTime String   @default("")
+  scheduleTime String @default("")
 
-  otpTemplateId String  @default("")
-  otpExpiry    Int      @default(10)
-  otpLength    Int      @default(6)
-  otpValue     String   @default("")
-  retryType    String   @default("text")
+  otpTemplateId String @default("")
+  otpExpiry     Int    @default(10)
+  otpLength     Int    @default(6)
+  otpValue      String @default("")
+  retryType     String @default("text")
 
   whatsappTemplate String @default("")
   whatsappLang     String @default("en")
   whatsappParams   String @default("[]") @db.Text
   integratedNumber String @default("")
 
-  mediaType    String   @default("image")
-  mediaUrl     String   @default("")
-  mediaCaption String   @default("")
+  mediaType    String @default("image")
+  mediaUrl     String @default("")
+  mediaCaption String @default("")
 
-  voiceMessage String   @default("")
+  voiceMessage String @default("")
 
-  toEmail      String   @default("")
-  subject      String   @default("")
-  emailBody    String   @default("") @db.Text
-  fromEmail    String   @default("")
-  fromName     String   @default("")
+  toEmail   String @default("")
+  subject   String @default("")
+  emailBody String @default("") @db.Text
+  fromEmail String @default("")
+  fromName  String @default("")
 
-  requestId    String   @default("")
+  requestId String @default("")
 
   continueOnFail Boolean @default(false)
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  workflow     workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  workflow workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
 
   @@index([workflowId])
   @@index([nodeId])

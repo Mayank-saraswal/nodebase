@@ -43,7 +43,6 @@ export interface SlackFormValues {
   channelPurpose?: string
   userId?: string
   emoji?: string
-  webhookUrl?: string
   blockKit?: string
   botName?: string
   iconEmoji?: string
@@ -280,7 +279,6 @@ export const SlackDialog = ({
   )
   const [slackUserId, setSlackUserId] = useState(defaultValues.userId || "")
   const [emoji, setEmoji] = useState(defaultValues.emoji || "")
-  const [webhookUrl, setWebhookUrl] = useState(defaultValues.webhookUrl || "")
   const [blockKit, setBlockKit] = useState(defaultValues.blockKit || "")
   const [botName, setBotName] = useState(defaultValues.botName || "")
   const [iconEmoji, setIconEmoji] = useState(defaultValues.iconEmoji || "")
@@ -340,7 +338,6 @@ export const SlackDialog = ({
       setChannelPurpose(config.channelPurpose)
       setSlackUserId(config.userId)
       setEmoji(config.emoji)
-      setWebhookUrl(config.webhookUrl)
       setBlockKit(config.blockKit)
       setBotName(config.botName)
       setIconEmoji(config.iconEmoji)
@@ -380,7 +377,6 @@ export const SlackDialog = ({
       setChannelPurpose(defaultValues.channelPurpose || "")
       setSlackUserId(defaultValues.userId || "")
       setEmoji(defaultValues.emoji || "")
-      setWebhookUrl(defaultValues.webhookUrl || "")
       setBlockKit(defaultValues.blockKit || "")
       setBotName(defaultValues.botName || "")
       setIconEmoji(defaultValues.iconEmoji || "")
@@ -442,7 +438,6 @@ export const SlackDialog = ({
       channelPurpose,
       userId: slackUserId,
       emoji,
-      webhookUrl,
       blockKit,
       botName,
       iconEmoji,
@@ -482,7 +477,6 @@ export const SlackDialog = ({
         channelPurpose,
         userId: slackUserId,
         emoji,
-        webhookUrl,
         blockKit,
         botName,
         iconEmoji,

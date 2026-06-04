@@ -91,31 +91,31 @@ model LoopNode {
 }
 
 model WaitNode {
-  id               String   @id @default(cuid())
-  nodeId           String   @unique
-  workflowId       String
+  id         String @id @default(cuid())
+  nodeId     String @unique
+  workflowId String
 
   // Resume mode: "duration" | "until" | "webhook"
-  waitMode         String   @default("duration")
+  waitMode String @default("duration")
 
   // Duration mode fields
-  duration         Int      @default(30)
-  durationUnit     String   @default("minutes")
+  duration     Int    @default(30)
+  durationUnit String @default("minutes")
 
   // Until mode fields
-  untilDatetime    String   @default("")
-  timezone         String   @default("UTC")
+  untilDatetime String @default("")
+  timezone      String @default("UTC")
 
   // Webhook mode fields
-  timeoutDuration  Int      @default(24)
-  timeoutUnit      String   @default("hours")
+  timeoutDuration   Int     @default(24)
+  timeoutUnit       String  @default("hours")
   continueOnTimeout Boolean @default(true)
 
   // Output
-  variableName     String   @default("wait")
+  variableName String @default("wait")
 
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   workflow workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
 
@@ -124,12 +124,12 @@ model WaitNode {
 }
 
 model MergeNode {
-  id           String @id @default(cuid())
-  nodeId       String @unique
-  workflowId   String
+  id         String @id @default(cuid())
+  nodeId     String @unique
+  workflowId String
 
   // How many input branches to wait for (2-10)
-  inputCount   Int    @default(2)
+  inputCount Int @default(2)
 
   // Merge strategy:
   // "position"   — zip by index position
@@ -137,13 +137,13 @@ model MergeNode {
   // "crossJoin"  — cartesian product of all items
   // "keyMatch"   — inner join by a key field
   // "keyDiff"    — outer difference — items in branch1 NOT in branch2
-  mergeMode    String @default("combine")
+  mergeMode String @default("combine")
 
   // For keyMatch and keyDiff modes:
   // The dot-path field to match on e.g. "orderId" or "email"
   // Supports {{variables}} — resolved at runtime
-  matchKey1    String @default("")
-  matchKey2    String @default("")
+  matchKey1 String @default("")
+  matchKey2 String @default("")
 
   // For position mode:
   // "shortest" — zip to shortest branch length
@@ -153,20 +153,20 @@ model MergeNode {
   // Branch variable name selection
   // branchKey1/branchKey2 — variable names of the first/second branch (e.g. "gmail", "slack")
   // branchKeys — comma-separated list for 3+ branch modes (e.g. "gmail,slack,notion")
-  branchKey1   String @default("")
-  branchKey2   String @default("")
-  branchKeys   String @default("")
+  branchKey1 String @default("")
+  branchKey2 String @default("")
+  branchKeys String @default("")
 
   // Wait for ALL branches to complete before merging
-  waitForAll   Boolean @default(true)
+  waitForAll Boolean @default(true)
 
   // Output variable name
   variableName String @default("merge")
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  workflow     workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  workflow workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
 
   @@index([workflowId])
   @@index([nodeId])
