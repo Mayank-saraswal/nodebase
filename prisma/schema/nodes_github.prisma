@@ -1,0 +1,75 @@
+// ─────────────────────────────────────────────────────────────
+// Nodebase — Prisma Schema: GitHub Nodes
+// GitHubNode, GitHubTriggerNode
+// ─────────────────────────────────────────────────────────────
+
+model GitHubNode {
+  id     String @id @default(cuid())
+  nodeId String @unique
+
+  workflowId String
+  workflow   workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  credentialId String?
+  credential   Credential? @relation(fields: [credentialId], references: [id])
+
+  operation GitHubOperation @default(USER_GET_CURRENT)
+
+  // Common Fields (Templated)
+  owner       String @default("")
+  repo        String @default("")
+  branch      String @default("")
+  filePath    String @default("")
+  fileContent String @default("") @db.Text
+  commitMessage String @default("")
+
+  // Issue / PR Fields
+  issueNumber   String @default("")
+  pullNumber    String @default("")
+  title         String @default("")
+  body          String @default("") @db.Text
+  state         String @default("")
+  labels        String @default("") // JSON string array
+  assignees     String @default("") // JSON string array
+  headBranch    String @default("")
+  baseBranch    String @default("")
+
+  // Workflow / Event Fields
+  workflowId_github String @default("") // Renamed to avoid collision with Nodebase workflowId
+  eventType         String @default("")
+  clientPayload     String @default("") @db.Text
+
+  // Search / Filter Fields
+  searchQuery String @default("")
+  perPage     Int    @default(30)
+  
+  // Other fields specific to releases, codespaces, rulesets, etc.
+  tagName       String @default("")
+  releaseName   String @default("")
+  draft         Boolean @default(false)
+  prerelease    Boolean @default(false)
+  
+  // Generic JSON options for all other specific flags and options
+  options Json @default("{}")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+model GitHubTriggerNode {
+  id     String @id @default(cuid())
+  nodeId String @unique
+
+  workflowId String
+  workflow   workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  owner  String @default("")
+  repo   String @default("")
+  events String @default("[\"push\"]") // JSON string array of GitHub webhook events
+
+  webhookId String? // The ID of the webhook created in GitHub, to allow cleanup
+  webhookSecret String? // The secret used to verify the incoming payload
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}

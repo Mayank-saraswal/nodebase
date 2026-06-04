@@ -39,7 +39,8 @@ import { filterExecutor } from "../components/filter/executor";
 import { cashfreeExecutor } from "../components/cashfree/executor";
 import { aggregateExecutor } from "../components/aggregate/executor";
 import { postgresExecutor } from "../components/postgres/executor";
-
+import { githubExecutor } from "../components/github/executor";
+import { githubTriggerExecutor } from "@/features/triggers/components/github-trigger/executor";
 
 export const executorRegistry: Record<NodeType, NodeExecutor> = {
     [NodeType.MANUAL_TRIGGER]: manualTriggerExecutor,
@@ -89,7 +90,8 @@ export const executorRegistry: Record<NodeType, NodeExecutor> = {
     [NodeType.CASHFREE_TRIGGER]: cashfreeExecutor,
     [NodeType.AGGREGATE]: aggregateExecutor,
     [NodeType.POSTGRES]: postgresExecutor,
-
+    [NodeType.GITHUB]: githubExecutor,
+    [NodeType.GITHUB_TRIGGER]: githubTriggerExecutor,
 }
 
 export const getExecutor = (type: NodeType): NodeExecutor => {

@@ -153,7 +153,9 @@ const credentialsLogos: Record<CredentialType, string> = {
   [CredentialType.HUBSPOT]: "/logos/hubspot.svg",
   [CredentialType.FRESHDESK]: "/logos/freshdesk.svg",
   [CredentialType.CASHFREE]: "/logos/cashfree.svg",
-  [CredentialType.POSTGRES]: "/logos/postgres.svg",
+  [CredentialType.POSTGRES]: "/logos/postgresql.svg",
+  [CredentialType.GITHUB]: "/logos/github.svg",
+  [CredentialType.GITHUB_APP]: "/logos/github.svg",
 }
 
 export const CredentialsItem = ({
