@@ -123,11 +123,19 @@ export const githubExecutor: NodeExecutor<GitHubNodeData> = async ({
       }
     });
   } catch (error) {
+    if ((config as unknown as GitHubConfig).continueOnFail) {
+      await publish(githubChannel().status({ nodeId, status: "success" }));
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const varName = (config as unknown as GitHubConfig).variableName || "github";
+      return { ...context, [`${varName}Error`]: errorMessage };
+    }
+
     await publish(githubChannel().status({ nodeId, status: "error" }));
     throw error;
   }
 
   await publish(githubChannel().status({ nodeId, status: "success" }));
   // Merge context with result so downstream nodes see accumulated data
-  return { ...context, github: result };
+  const varName = (config as unknown as GitHubConfig).variableName || "github";
+  return { ...context, [varName]: result };
 };

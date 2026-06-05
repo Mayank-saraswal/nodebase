@@ -116,6 +116,8 @@ export const credentialsRouter = createTRPCRouter({
             
             let connectedEmail: string | undefined
             let isGoogleOAuth = false
+            let connectedGithubUsername: string | undefined
+            let isGithubOAuth = false
 
             if (googleTypes.includes(credential.type)) {
                 try {
@@ -129,11 +131,25 @@ export const credentialsRouter = createTRPCRouter({
 
                 // Strip value for Google — UI uses connectedEmail/isGoogleOAuth instead
                 const { value: _v, ...googleFields } = credential
-                return { ...googleFields, connectedEmail, isGoogleOAuth }
+                return { ...googleFields, connectedEmail, isGoogleOAuth, connectedGithubUsername: undefined, isGithubOAuth: false }
             }
 
-            // Non-Google: return value so form can pre-populate credential fields
-            return { ...credential, connectedEmail: undefined, isGoogleOAuth: false }
+            if (credential.type === CredentialType.GITHUB_APP) {
+                try {
+                    const parsed = JSON.parse(decrypt(credential.value)) as {
+                        username?: string
+                        accessToken?: string
+                    }
+                    connectedGithubUsername = parsed.username
+                    isGithubOAuth = !!parsed.accessToken
+                } catch { /* ignore */ }
+
+                const { value: _v, ...githubFields } = credential
+                return { ...githubFields, connectedEmail: undefined, isGoogleOAuth: false, connectedGithubUsername, isGithubOAuth }
+            }
+
+            // Non-Google and Non-GitHubApp: return value so form can pre-populate credential fields
+            return { ...credential, connectedEmail: undefined, isGoogleOAuth: false, connectedGithubUsername: undefined, isGithubOAuth: false }
         }),
 
     getMany: protectedProcedure
@@ -203,6 +219,26 @@ export const credentialsRouter = createTRPCRouter({
                 where: {
                     userId: ctx.auth.user.id,
                     type,
+                },
+                orderBy: {
+                    updatedAt: "desc"
+                },
+            })
+        }),
+    getByTypes: protectedProcedure
+        .input(
+            z.object({
+                types: z.array(z.nativeEnum(CredentialType))
+            })
+        )
+        .query(({ ctx, input }) => {
+            const { types } = input;
+            return prisma.credential.findMany({
+                where: {
+                    userId: ctx.auth.user.id,
+                    type: {
+                        in: types
+                    }
                 },
                 orderBy: {
                     updatedAt: "desc"

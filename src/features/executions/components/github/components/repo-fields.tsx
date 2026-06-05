@@ -30,7 +30,10 @@ export function RepoFields({ values, setValues }: RepoFieldsProps) {
               value={values.owner || ""}
               onChange={(e) => setValues({ ...values, owner: e.target.value })}
             />
-            <p className="text-xs text-muted-foreground">The account owner of the repository. Supports template variables.</p>
+            <p className="text-xs text-muted-foreground">
+              The account owner or organization of the repository. 
+              {op === "REPOSITORY_CREATE" && <span className="font-semibold text-primary"> Leave blank to create a repository in your personal account.</span>}
+            </p>
           </div>
           <div className="space-y-2">
             <Label>Repository Name</Label>
@@ -148,14 +151,28 @@ export function RepoFields({ values, setValues }: RepoFieldsProps) {
 
       {/* Repo create description */}
       {op === "REPOSITORY_CREATE" && (
-        <div className="space-y-2">
-          <Label>Description</Label>
-          <Textarea
-            placeholder="Repository description..."
-            value={values.body || ""}
-            onChange={(e) => setValues({ ...values, body: e.target.value })}
-          />
-        </div>
+        <>
+          <div className="space-y-2">
+            <Label>Description</Label>
+            <Textarea
+              placeholder="Repository description..."
+              value={values.body || ""}
+              onChange={(e) => setValues({ ...values, body: e.target.value })}
+            />
+          </div>
+          <div className="flex items-center gap-3">
+            <Switch
+              checked={!!values.options?.private}
+              onCheckedChange={(v) =>
+                setValues({
+                  ...values,
+                  options: { ...values.options, private: v },
+                })
+              }
+            />
+            <Label>Private Repository</Label>
+          </div>
+        </>
       )}
 
       {/* Repo dispatch */}

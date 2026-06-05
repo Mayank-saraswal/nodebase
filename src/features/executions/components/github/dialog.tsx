@@ -20,11 +20,14 @@ import {
 } from "@/components/ui/select"
 import { useTRPC } from "@/trpc/client"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useCredentialsByType } from "@/features/credentials/hooks/use-credentials"
+import { useCredentialsByTypes } from "@/features/credentials/hooks/use-credentials"
 import { CredentialType, GitHubOperation } from "@/generated/prisma"
-import { Loader2Icon } from "lucide-react"
+import { Loader2Icon, InfoIcon } from "lucide-react"
 import Link from "next/link"
 import { Separator } from "@/components/ui/separator"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 
 import { GitHubConfig } from "./types"
 import { RepoFields } from "./components/repo-fields"
@@ -48,7 +51,7 @@ export function GitHubDialog({
 }: GitHubDialogProps) {
   const trpc = useTRPC()
   const queryClient = useQueryClient()
-  const { data: credentials, isLoading: isLoadingCreds } = useCredentialsByType(CredentialType.GITHUB)
+  const { data: credentials, isLoading: isLoadingCreds } = useCredentialsByTypes([CredentialType.GITHUB, CredentialType.GITHUB_APP])
 
   const [values, setValues] = useState<Partial<GitHubConfig>>({
     operation: GitHubOperation.USER_GET_CURRENT,
@@ -207,7 +210,7 @@ export function GitHubDialog({
               <p className="text-xs text-muted-foreground">
                 Don&apos;t have a credential?{" "}
                 <Link
-                  href="/dashboard/credentials"
+                  href="/credentials"
                   target="_blank"
                   className="text-primary hover:underline"
                 >
@@ -252,6 +255,51 @@ export function GitHubDialog({
 
             {/* Dynamic Fields */}
             {renderFields()}
+
+            <Separator />
+
+            {/* Output Configuration */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="continueOnFail">Continue On Fail</Label>
+                  <p className="text-[10px] text-muted-foreground">
+                    If enabled, workflow will not crash on error. The error will be output to the variable.
+                  </p>
+                </div>
+                <Switch
+                  id="continueOnFail"
+                  checked={values.continueOnFail ?? false}
+                  onCheckedChange={(v) => setValues({ ...values, continueOnFail: v })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="variableName">Output Variable Name</Label>
+                <Input
+                  id="variableName"
+                  placeholder="github"
+                  value={values.variableName || ""}
+                  onChange={(e) => setValues({ ...values, variableName: e.target.value })}
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Leave empty to use the default variable name.
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-md bg-blue-50 dark:bg-blue-900/20 p-3 mt-4 border border-blue-100 dark:border-blue-800">
+              <div className="flex gap-2">
+                <div className="text-blue-500 dark:text-blue-400 mt-0.5 shrink-0">
+                  <InfoIcon className="h-4 w-4" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-blue-800 dark:text-blue-300">Node Output</h4>
+                  <p className="text-xs text-blue-700 dark:text-blue-400/90 mt-1">
+                    The result of this operation is saved to the <code className="bg-blue-100 dark:bg-blue-900/50 px-1 py-0.5 rounded font-mono text-blue-900 dark:text-blue-200">{values.variableName || "github"}</code> variable. You can use <code className="bg-blue-100 dark:bg-blue-900/50 px-1 py-0.5 rounded font-mono text-blue-900 dark:text-blue-200">{`{{${values.variableName || "github"}}}`}</code> in any subsequent nodes to access this data.
+                  </p>
+                </div>
+              </div>
+            </div>
 
             <div className="flex justify-end gap-2 pt-4">
               <Button variant="outline" onClick={() => onOpenChange(false)}>

@@ -31,4 +31,6 @@ export interface GitHubConfig {
   draft?: boolean;
   prerelease?: boolean;
   options?: Record<string, unknown>;
+  variableName?: string;
+  continueOnFail?: boolean;
 }
