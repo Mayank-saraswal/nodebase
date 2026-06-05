@@ -31,6 +31,12 @@ model User {
   workflowRunsReset  DateTime       @default(now())
   billingEvents      BillingEvent[]
 
+  // ── AI Agent ────────────────────────────────────────────────────────────────
+  agentConversations AgentConversation[]
+  agentUsages        AgentUsage[]
+  aiGuardrailLogs    AIGuardrailLog[]
+  aiPreference       AIPreference?
+
   @@unique([email])
   @@map("user")
 }
