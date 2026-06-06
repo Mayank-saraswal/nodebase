@@ -15,7 +15,7 @@ type PerplexityData = {
     systemPrompt?: string;
 };
 export const perplexityExecutor: NodeExecutor<PerplexityData> = async ({
-    data,
+  data,
     nodeId,
     context,
     step,

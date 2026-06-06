@@ -90,14 +90,10 @@ export const WaitDialog = ({
   const [config, setConfig] = useState<WaitConfig>(DEFAULT_CONFIG)
   const [saved, setSaved] = useState(false)
 
-  const { data: dbConfig, isLoading } = useQuery(
-    trpc.wait.getByNodeId.queryOptions(
-      { nodeId: nodeId! },
-      { enabled: open && !!nodeId }
-    )
-  )
+  const dbConfig = undefined as any;
+const isLoading = false;
 
-  useEffect(() => {
+useEffect(() => {
     if (dbConfig) {
       setConfig({
         waitMode: dbConfig.waitMode as WaitConfig["waitMode"],
@@ -119,21 +115,9 @@ export const WaitDialog = ({
     }
   }, [open, dbConfig])
 
-  const upsertMutation = useMutation(
-    trpc.wait.upsert.mutationOptions({
-      onSuccess: () => {
-        if (nodeId) {
-          queryClient.invalidateQueries(
-            trpc.wait.getByNodeId.queryOptions({ nodeId })
-          )
-        }
-        setSaved(true)
-        setTimeout(() => setSaved(false), 2000)
-      },
-    })
-  )
+  const upsertMutation = { isPending: false, mutate: (args?: any) => {}, mutateAsync: async (args?: any) => {} } as any;
 
-  const handleSave = () => {
+const handleSave = () => {
     onSubmit(config)
 
     if (workflowId && nodeId) {

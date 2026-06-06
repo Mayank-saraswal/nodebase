@@ -4,7 +4,7 @@ import prisma from "@/lib/db"
 import { decrypt } from "@/lib/encryption"
 import { resolveTemplate } from "@/features/executions/lib/template-resolver"
 import { notionChannel } from "@/inngest/channels/notion"
-import { NotionOperation } from "@/generated/prisma"
+import { NotionOperation } from "@/features/executions/enums"
 
 interface NotionCredential {
   apiKey: string
@@ -46,8 +46,7 @@ async function notionRequest(
   return (await response.json()) as Record<string, unknown>
 }
 
-export const notionExecutor: NodeExecutor<NotionData> = async ({
-  nodeId,
+export const notionExecutor: NodeExecutor<NotionData> = async ({ data, nodeId,
   context,
   step,
   publish,
@@ -61,11 +60,9 @@ export const notionExecutor: NodeExecutor<NotionData> = async ({
   )
 
   // Step 1: Load config
-  const config = await step.run(`notion-${nodeId}-load-config`, async () => {
-    return prisma.notionNode.findUnique({ where: { nodeId } })
-  })
+  const config = data as any;
 
-  if (!config) {
+if (!config) {
     await publish(
       notionChannel().status({
         nodeId,

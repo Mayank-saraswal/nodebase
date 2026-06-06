@@ -15,7 +15,7 @@ type GeminiData = {
     systemPrompt?: string;
 };
 export const geminiExecutor:NodeExecutor<GeminiData > = async({
-    data,
+  data,
     nodeId,
     context,
     step,

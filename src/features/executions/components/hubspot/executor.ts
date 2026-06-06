@@ -4,7 +4,7 @@ import prisma from "@/lib/db"
 import { decrypt, encrypt } from "@/lib/encryption"
 import { resolveTemplate } from "@/features/executions/lib/template-resolver"
 import { hubspotChannel } from "@/inngest/channels/hubspot"
-import { HubspotOperation } from "@/generated/prisma"
+import { HubspotOperation } from "@/features/executions/enums"
 
 const HUBSPOT_API_BASE = "https://api.hubapi.com"
 const HUBSPOT_TOKEN_URL = "https://api.hubapi.com/oauth/v1/token"
@@ -140,15 +140,10 @@ function parseCustomProperties(customProps: string): Record<string, unknown> {
   }
 }
 
-export const hubspotExecutor: NodeExecutor = async ({ nodeId, context, step, publish }) => {
-  const config = await step.run(`hubspot-${nodeId}-load`, async () =>
-    prisma.hubspotNode.findUnique({
-      where: { nodeId },
-      include: { credential: true },
-    })
-  )
+export const hubspotExecutor: NodeExecutor = async ({ data, nodeId, context, step, publish }) => {
+  const config = data as any;
 
-  await step.run(`hubspot-${nodeId}-validate`, async () => {
+await step.run(`hubspot-${nodeId}-validate`, async () => {
     if (!config) throw new NonRetriableError("HubSpot node not configured")
     if (!config.credentialId || !config.credential) {
       throw new NonRetriableError("HubSpot: No credential connected.")

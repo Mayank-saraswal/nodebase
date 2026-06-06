@@ -17,22 +17,16 @@ function tryParseJson<T>(str: string, fallback: T): T {
 
 type AiNodeData = { nodeId?: string }
 
-export const aiExecutor: NodeExecutor<AiNodeData> = async ({
-  nodeId,
+export const aiExecutor: NodeExecutor<AiNodeData> = async ({ data, nodeId,
   context,
   step,
   publish,
   userId,
 }) => {
   // ── Step 1: Load config ────────────────────────────────────────────────────
-  const config = await step.run(`ai-${nodeId}-load`, async () => {
-    return prisma.aINode.findUnique({
-      where: { nodeId },
-      include: { workflow: { select: { userId: true } } },
-    })
-  })
+  const config = data as any;
 
-  // ── Step 2: Validate ───────────────────────────────────────────────────────
+// ── Step 2: Validate ───────────────────────────────────────────────────────
   await step.run(`ai-${nodeId}-validate`, async () => {
     if (!config) {
       throw new NonRetriableError(
@@ -128,9 +122,9 @@ export const aiExecutor: NodeExecutor<AiNodeData> = async ({
       imageQuality: config.imageQuality,
       imageStyle: config.imageStyle,
       imageCount: config.imageCount,
-      classifyLabels: config.classifyLabels
+      classifyLabels: String(config.classifyLabels || "")
         .split(",")
-        .map((s) => s.trim())
+        .map((s: string) => s.trim())
         .filter(Boolean),
       classifyExamples: tryParseJson<Array<{ text: string; label: string }>>(
         r(config.classifyExamples),

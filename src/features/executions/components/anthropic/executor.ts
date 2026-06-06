@@ -15,7 +15,7 @@ type AnthropicData = {
     systemPrompt?: string;
 };
 export const anthropicExecutor:NodeExecutor<AnthropicData > = async({
-    data,
+  data,
     nodeId,
     context,
     step,

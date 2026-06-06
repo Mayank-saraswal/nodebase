@@ -4,7 +4,7 @@ import prisma from "@/lib/db"
 import { decrypt } from "@/lib/encryption"
 import { resolveTemplate } from "@/features/executions/lib/template-resolver"
 import { msg91Channel } from "@/inngest/channels/msg91"
-import { Msg91Operation } from "@/generated/prisma"
+import { Msg91Operation } from "@/features/executions/enums"
 
 interface Msg91Credential {
   authKey: string
@@ -56,8 +56,7 @@ async function msg91Request(
   }
 }
 
-export const msg91Executor: NodeExecutor<Msg91Data> = async ({
-  nodeId,
+export const msg91Executor: NodeExecutor<Msg91Data> = async ({ data, nodeId,
   context,
   step,
   publish,
@@ -71,11 +70,9 @@ export const msg91Executor: NodeExecutor<Msg91Data> = async ({
   )
 
   // Step 1: Load config
-  const config = await step.run(`msg91-${nodeId}-load-config`, async () => {
-    return prisma.msg91Node.findUnique({ where: { nodeId } })
-  })
+  const config = data as any;
 
-  if (!config) {
+if (!config) {
     await publish(
       msg91Channel().status({
         nodeId,

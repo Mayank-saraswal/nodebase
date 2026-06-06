@@ -12,7 +12,7 @@ type TelegramData = {
     content?: string
 };
 export const telegramExecutor: NodeExecutor<TelegramData> = async ({
-    data,
+  data,
     nodeId,
     context,
     step,

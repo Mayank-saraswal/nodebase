@@ -15,7 +15,7 @@ type XData = {
 };
 
 export const xExecutor: NodeExecutor<XData> = async ({
-    data,
+  data,
     nodeId,
     context,
     step,

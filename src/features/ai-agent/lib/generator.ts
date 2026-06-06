@@ -63,6 +63,14 @@ ${getRegistryForPrompt()}
 
 9. **Missing Information & Clarification**: If the user's prompt is missing ANY critical configuration parameters (such as a target URL, an email address, a schedule interval, a channel name, a specific search query, etc.), YOU MUST NOT GUESS OR LEAVE IT UNCONFIGURED. You MUST return status: "needs_clarification" and ask the user for the exact missing parameter.
 
+10. **Node Configuration (data payload)**:
+   You MUST provide accurate configuration inside the \`data\` object for each node so they work out-of-the-box. ALWAYS provide a \`variableName\` for action nodes so their output can be referenced.
+   - HTTP_REQUEST: { "endpoint": "https://api.example.com", "method": "GET", "variableName": "httpData", "contentType": "json" }
+   - GMAIL: { "operation": "SEND_EMAIL", "variableName": "gmailResult", "toEmail": "user@example.com", "subject": "Update", "body": "Hello" }
+   - OPENAI: { "operation": "CHAT", "variableName": "openaiResult", "systemPrompt": "Be helpful", "userMessage": "Summarize this: {{httpData.data}}" }
+   - SLACK: { "operation": "SEND_MESSAGE", "variableName": "slack", "channel": "#general", "text": "Hello" }
+   - IF_ELSE: { "field": "httpData.status", "operator": "EQUALS", "value": "success" }
+
 Always include reasoning to help users understand your choices.`;
 }
 

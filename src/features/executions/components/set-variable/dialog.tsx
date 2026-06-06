@@ -44,14 +44,10 @@ export const SetVariableDialog = ({
   const [saved, setSaved] = useState(false)
   const [keyErrors, setKeyErrors] = useState<Record<number, string>>({})
 
-  const { data: config, isLoading } = useQuery(
-    trpc.setVariable.getByNodeId.queryOptions(
-      { nodeId: nodeId! },
-      { enabled: open && !!nodeId }
-    )
-  )
+  const config = undefined as any;
+const isLoading = false;
 
-  // Pre-fill from DB config when loaded
+// Pre-fill from DB config when loaded
   useEffect(() => {
     if (config) {
       const loadedPairs = config.pairs as unknown as Pair[]
@@ -69,21 +65,9 @@ export const SetVariableDialog = ({
     }
   }, [open, config])
 
-  const upsertMutation = useMutation(
-    trpc.setVariable.upsert.mutationOptions({
-      onSuccess: () => {
-        if (nodeId) {
-          queryClient.invalidateQueries(
-            trpc.setVariable.getByNodeId.queryOptions({ nodeId })
-          )
-        }
-        setSaved(true)
-        setTimeout(() => setSaved(false), 2000)
-      },
-    })
-  )
+  const upsertMutation = { isPending: false, mutate: (args?: any) => {}, mutateAsync: async (args?: any) => {} } as any;
 
-  const updatePair = (index: number, field: "key" | "value", val: string) => {
+const updatePair = (index: number, field: "key" | "value", val: string) => {
     setPairs((prev) => prev.map((p, i) => (i === index ? { ...p, [field]: val } : p)))
     if (field === "key") {
       if (val && !KEY_PATTERN.test(val)) {

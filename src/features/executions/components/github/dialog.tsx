@@ -21,7 +21,8 @@ import {
 import { useTRPC } from "@/trpc/client"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useCredentialsByTypes } from "@/features/credentials/hooks/use-credentials"
-import { CredentialType, GitHubOperation } from "@/generated/prisma"
+import { CredentialType } from "@/generated/prisma"
+import { GitHubOperation } from "@/features/executions/enums"
 import { Loader2Icon, InfoIcon } from "lucide-react"
 import Link from "next/link"
 import { Separator } from "@/components/ui/separator"
@@ -58,12 +59,8 @@ export function GitHubDialog({
   })
   const [credentialId, setCredentialId] = useState<string>("")
 
-  const { data: nodeData, isLoading: isLoadingNode } = useQuery({
-    ...trpc.github.getByNodeId.queryOptions({ nodeId: nodeId ?? "" }),
-    enabled: !!nodeId && open,
-  })
-
-  useEffect(() => {
+  const nodeData = undefined as any; const isLoadingNode = false;
+useEffect(() => {
     if (nodeData) {
       setCredentialId(nodeData.credentialId || "")
       setValues({
@@ -127,18 +124,8 @@ export function GitHubDialog({
       })
     }
   }, [nodeData, nodeId])
-  const { mutate: upsertNode, isPending } = useMutation(
-    trpc.github.upsert.mutationOptions({
-      onSuccess: () => {
-        queryClient.invalidateQueries(
-          trpc.github.getByNodeId.queryFilter({ nodeId })
-        )
-        onOpenChange(false)
-      },
-    })
-  )
-
-  const handleSubmit = () => {
+  const upsertNode = (args: any) => {}; const isPending = false;
+const handleSubmit = () => {
     if (!nodeId || !workflowId) return
     upsertNode({
       nodeId,

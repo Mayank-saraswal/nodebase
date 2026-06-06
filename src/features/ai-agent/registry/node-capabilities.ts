@@ -102,7 +102,7 @@ export const EXECUTION_NODES: NodeCapability[] = [
       { name: "httpRequest.status", description: "HTTP status code", example: "200" },
     ],
     maxInputs: 1, maxOutputs: 1, useCases: ["API calls", "webhook responses", "data fetching"],
-    exampleData: '{"method": "GET", "url": "https://api.example.com", "body": "{}", "headers": "{}"}',
+    exampleData: '{"method": "GET", "endpoint": "https://api.example.com", "variableName": "httpData", "body": "{}", "headers": []}',
   },
   {
     type: NodeType.CODE, category: "execution", label: "Code",
@@ -140,7 +140,7 @@ export const COMMUNICATION_NODES: NodeCapability[] = [
     operations: ["SEND", "REPLY", "FORWARD", "GET_MESSAGE", "SEARCH_MESSAGES"],
     outputVariables: [{ name: "gmail.messageId", description: "Email message ID", example: "msgxxx" }],
     maxInputs: 1, maxOutputs: 1, useCases: ["email automation", "notifications", "follow-ups"],
-    exampleData: '{"operation": "SEND", "to": "user@example.com", "subject": "Hello", "body": "Message"}',
+    exampleData: '{"operation": "SEND", "variableName": "gmailResponse", "to": "user@example.com", "subject": "Hello", "body": "Message"}',
   },
   {
     type: NodeType.WHATSAPP, category: "communication", label: "WhatsApp",

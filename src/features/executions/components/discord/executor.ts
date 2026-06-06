@@ -14,7 +14,7 @@ type DiscordData = {
     username?:string
 };
 export const discordExecutor:NodeExecutor<DiscordData > = async({
-    data,
+  data,
     nodeId,
     context,
     step,

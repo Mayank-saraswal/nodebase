@@ -1,4 +1,4 @@
-import { GitHubOperation } from "@/generated/prisma";
+import { GitHubOperation } from "@/features/executions/enums"
 
 export interface GitHubNodeData {
   nodeId?: string;

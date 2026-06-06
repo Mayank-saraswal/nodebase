@@ -48,64 +48,17 @@ export const Editor = ({workflowId}:{workflowId:string}) => {
      const [edges, setEdges] = useState<Edge[]>(workflow.edges);
 
     // DB cleanup mutations — fire-and-forget when nodes are deleted from canvas
-    const deleteCode = useMutation(trpc.code.delete.mutationOptions())
-    const deleteGmail = useMutation(trpc.gmail.delete.mutationOptions())
-    const deleteGoogleDrive = useMutation(trpc.googleDrive.delete.mutationOptions())
-    const deleteGoogleSheets = useMutation(trpc.googleSheets.delete.mutationOptions())
-    const deleteIfElse = useMutation(trpc.ifElse.delete.mutationOptions())
-    const deleteLoop = useMutation(trpc.loop.delete.mutationOptions())
-    const deleteNotion = useMutation(trpc.notion.delete.mutationOptions())
-    const deleteRazorpay = useMutation(trpc.razorpay.delete.mutationOptions())
-    const deleteSetVariable = useMutation(trpc.setVariable.delete.mutationOptions())
-    const deleteSlack = useMutation(trpc.slack.delete.mutationOptions())
-    const deleteSwitch = useMutation(trpc.switch.delete.mutationOptions())
-    const deleteWhatsapp = useMutation(trpc.whatsapp.delete.mutationOptions())
-    const deleteWait = useMutation(trpc.wait.delete.mutationOptions())
-    const deleteMerge = useMutation(trpc.merge.delete.mutationOptions())
     const deleteErrorTrigger = useMutation(trpc.errorTrigger.delete.mutationOptions())
-    const deleteRazorpayTrigger = useMutation(trpc.razorpayTrigger.delete.mutationOptions())
-    const deleteWhatsappTrigger = useMutation(trpc.whatsappTrigger.delete.mutationOptions())
-    const deleteMsg91 = useMutation(trpc.msg91.delete.mutationOptions())
-    const deleteShiprocket = useMutation(trpc.shiprocket.delete.mutationOptions())
-    const deleteZohoCrm = useMutation(trpc.zohoCrm.delete.mutationOptions())
-    const deleteHubspot = useMutation(trpc.hubspot.delete.mutationOptions())
-    const deleteFreshdesk = useMutation(trpc.freshdesk.delete.mutationOptions())
-    const deleteFilter = useMutation(trpc.filter.delete.mutationOptions())
-    const deleteCashfree = useMutation(trpc.cashfree.delete.mutationOptions())
 
 
     const onNodesDelete = useCallback((deletedNodes: Node[]) => {
       for (const node of deletedNodes) {
         const nodeId = node.id
         switch (node.type) {
-          case NodeType.CODE: deleteCode.mutate({ nodeId }); break
-          case NodeType.GMAIL: deleteGmail.mutate({ nodeId }); break
-          case NodeType.GOOGLE_DRIVE: deleteGoogleDrive.mutate({ nodeId }); break
-          case NodeType.GOOGLE_SHEETS: deleteGoogleSheets.mutate({ nodeId }); break
-          case NodeType.IF_ELSE: deleteIfElse.mutate({ nodeId }); break
-          case NodeType.LOOP: deleteLoop.mutate({ nodeId }); break
-          case NodeType.NOTION: deleteNotion.mutate({ nodeId }); break
-          case NodeType.RAZORPAY: deleteRazorpay.mutate({ nodeId }); break
-          case NodeType.SET_VARIABLE: deleteSetVariable.mutate({ nodeId }); break
-          case NodeType.SLACK: deleteSlack.mutate({ nodeId }); break
-          case NodeType.SWITCH: deleteSwitch.mutate({ nodeId }); break
-          case NodeType.WHATSAPP: deleteWhatsapp.mutate({ nodeId }); break
-          case NodeType.WAIT: deleteWait.mutate({ nodeId }); break
-          case NodeType.MERGE: deleteMerge.mutate({ nodeId }); break
           case NodeType.ERROR_TRIGGER: deleteErrorTrigger.mutate({ nodeId }); break
-          case NodeType.RAZORPAY_TRIGGER: deleteRazorpayTrigger.mutate({ nodeId }); break
-          case NodeType.WHATSAPP_TRIGGER: deleteWhatsappTrigger.mutate({ nodeId }); break
-          case NodeType.MSG91: deleteMsg91.mutate({ nodeId }); break
-          case NodeType.SHIPROCKET: deleteShiprocket.mutate({ nodeId }); break
-          case NodeType.ZOHO_CRM: deleteZohoCrm.mutate({ nodeId }); break
-          case NodeType.HUBSPOT: deleteHubspot.mutate({ nodeId }); break
-          case NodeType.FRESHDESK: deleteFreshdesk.mutate({ nodeId }); break
-          case NodeType.FILTER: deleteFilter.mutate({ nodeId }); break
-          case NodeType.CASHFREE: deleteCashfree.mutate({ nodeId }); break
-          case NodeType.CASHFREE_TRIGGER: deleteCashfree.mutate({ nodeId }); break
         }
       }
-    }, [deleteCode, deleteGmail, deleteGoogleDrive, deleteGoogleSheets, deleteIfElse, deleteLoop, deleteNotion, deleteRazorpay, deleteSetVariable, deleteSlack, deleteSwitch, deleteWhatsapp, deleteWait, deleteMerge, deleteErrorTrigger, deleteRazorpayTrigger, deleteWhatsappTrigger, deleteMsg91, deleteShiprocket, deleteZohoCrm, deleteHubspot, deleteFreshdesk, deleteFilter, deleteCashfree])
+    }, [deleteErrorTrigger]);
 
        const onNodesChange = useCallback(
     (changes:NodeChange[]) => setNodes((nodesSnapshot) => applyNodeChanges(changes, nodesSnapshot)),

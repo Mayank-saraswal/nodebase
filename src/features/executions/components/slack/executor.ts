@@ -4,7 +4,7 @@ import prisma from "@/lib/db"
 import { decrypt } from "@/lib/encryption"
 import { resolveTemplate } from "@/features/executions/lib/template-resolver"
 import { slackChannel } from "@/inngest/channels/slack"
-import { SlackOperation } from "@/generated/prisma"
+import { SlackOperation } from "@/features/executions/enums"
 import { mimeTypeToExt } from "@/lib/media-service"
 
 /* ── Credential types ── */
@@ -140,8 +140,7 @@ async function slackFormDataRequest(
 
 /* ── Executor ── */
 
-export const slackExecutor: NodeExecutor<SlackData> = async ({
-  nodeId,
+export const slackExecutor: NodeExecutor<SlackData> = async ({ data, nodeId,
   context,
   step,
   publish,
@@ -150,11 +149,9 @@ export const slackExecutor: NodeExecutor<SlackData> = async ({
   await publish(slackChannel().status({ nodeId, status: "loading" }))
 
   // Step 1: Load config from DB
-  const config = await step.run(`slack-${nodeId}-load-config`, async () => {
-    return prisma.slackNode.findUnique({ where: { nodeId } })
-  })
+  const config = data as any;
 
-  if (!config) {
+if (!config) {
     await publish(slackChannel().status({ nodeId, status: "error" }))
     throw new NonRetriableError(
       "Slack node not configured. Open settings to configure."

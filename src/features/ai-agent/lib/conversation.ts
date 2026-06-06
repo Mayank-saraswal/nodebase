@@ -6,7 +6,7 @@
  */
 
 import prisma from "@/lib/db";
-import type { AgentAIProvider } from "@/generated/prisma";
+import { AgentAIProvider } from "@/features/executions/enums"
 import {
   MAX_MESSAGES_PER_CONVERSATION,
   MAX_CONTEXT_MESSAGES,

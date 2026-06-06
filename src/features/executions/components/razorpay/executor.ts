@@ -5,7 +5,7 @@ import prisma from "@/lib/db"
 import { decrypt } from "@/lib/encryption"
 import { resolveTemplate } from "@/features/executions/lib/template-resolver"
 import { razorpayChannel } from "@/inngest/channels/razorpay"
-import { RazorpayOperation } from "@/generated/prisma"
+import { RazorpayOperation } from "@/features/executions/enums"
 
 interface RazorpayCredential {
   keyId: string
@@ -60,8 +60,7 @@ function parseNotes(notesStr: string): Record<string, string> | undefined {
   }
 }
 
-export const razorpayExecutor: NodeExecutor<RazorpayData> = async ({
-  nodeId,
+export const razorpayExecutor: NodeExecutor<RazorpayData> = async ({ data, nodeId,
   context,
   step,
   publish,
@@ -75,11 +74,9 @@ export const razorpayExecutor: NodeExecutor<RazorpayData> = async ({
   )
 
   // Step 1: Load config
-  const config = await step.run(`razorpay-${nodeId}-load-config`, async () => {
-    return prisma.razorpayNode.findUnique({ where: { nodeId } })
-  })
+  const config = data as any;
 
-  if (!config) {
+if (!config) {
     await publish(
       razorpayChannel().status({
         nodeId,

@@ -13,7 +13,7 @@
  * In local dev without Redis, all rate/quota checks pass automatically.
  */
 
-import type { GuardrailViolationType } from "@/generated/prisma";
+import { GuardrailViolationType } from "@/features/executions/enums"
 import { MAX_PROMPT_LENGTH, MIN_PROMPT_FOR_TOPIC_CHECK, REDIS_KEYS, REDIS_TTL, GUARDRAIL_CONFIDENCE } from "../config/constants";
 
 export interface GuardrailResult {

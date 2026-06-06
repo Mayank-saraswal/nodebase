@@ -122,14 +122,10 @@ export const GoogleSheetsDialog = ({
   const { data: credentials, isLoading: isLoadingCredentials } =
     useCredentialsByType(CredentialType.GOOGLE_SHEETS)
 
-  const { data: config, isLoading } = useQuery(
-    trpc.googleSheets.getByNodeId.queryOptions(
-      { nodeId: nodeId! },
-      { enabled: open && !!nodeId }
-    )
-  )
+  const config = undefined as any;
+const isLoading = false;
 
-  // Pre-fill from DB config when loaded
+// Pre-fill from DB config when loaded
   useEffect(() => {
     if (config) {
       setCredentialId(config.credentialId || "")
@@ -177,21 +173,9 @@ export const GoogleSheetsDialog = ({
     }
   }, [open, defaultValues, config])
 
-  const upsertMutation = useMutation(
-    trpc.googleSheets.upsert.mutationOptions({
-      onSuccess: () => {
-        if (nodeId) {
-          queryClient.invalidateQueries(
-            trpc.googleSheets.getByNodeId.queryOptions({ nodeId })
-          )
-        }
-        setSaved(true)
-        setTimeout(() => setSaved(false), 2000)
-      },
-    })
-  )
+  const upsertMutation = { isPending: false, mutate: (args?: any) => {}, mutateAsync: async (args?: any) => {} } as any;
 
-  const isValid = !!credentialId.trim() && !!spreadsheetId.trim()
+const isValid = !!credentialId.trim() && !!spreadsheetId.trim()
 
   const handleSave = () => {
     if (!isValid) return

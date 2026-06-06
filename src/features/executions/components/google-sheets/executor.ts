@@ -3,7 +3,7 @@ import type { NodeExecutor } from "@/features/executions/types"
 import prisma from "@/lib/db"
 import { resolveTemplate } from "@/features/executions/lib/template-resolver"
 import { googleSheetsChannel } from "@/inngest/channels/google-sheets"
-import { GoogleSheetsOp } from "@/generated/prisma"
+import { GoogleSheetsOp } from "@/features/executions/enums"
 import { refreshGoogleSheetsAccessToken } from "@/lib/google-sheets-auth"
 
 const SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets"
@@ -76,8 +76,7 @@ type GoogleSheetsData = {
 
 // ─── Main executor ───────────────────────────────────────────────────────────
 
-export const googleSheetsExecutor: NodeExecutor<GoogleSheetsData> = async ({
-  nodeId,
+export const googleSheetsExecutor: NodeExecutor<GoogleSheetsData> = async ({ data, nodeId,
   context,
   step,
   publish,
@@ -88,14 +87,9 @@ export const googleSheetsExecutor: NodeExecutor<GoogleSheetsData> = async ({
   )
 
   // Step 1: Load config
-  const config = await step.run(
-    `google-sheets-${nodeId}-load`,
-    async () => {
-      return prisma.googleSheetsNode.findUnique({ where: { nodeId } })
-    }
-  )
+  const config = data as any;
 
-  if (!config || !config.credentialId || !config.spreadsheetId) {
+if (!config || !config.credentialId || !config.spreadsheetId) {
     await publish(
       googleSheetsChannel().status({ nodeId, status: "error" })
     )

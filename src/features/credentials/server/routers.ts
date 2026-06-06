@@ -5,6 +5,9 @@ import { PAGINATION } from "@/config/constants";
 import { CredentialType } from "@/generated/prisma";
 import { encrypt, decrypt } from "@/lib/encryption";
 import { TRPCError } from "@trpc/server";
+import { testConnection } from "@/features/executions/components/postgres/postgres-engine";
+import type { PostgresConnectionConfig } from "@/features/executions/components/postgres/postgres-engine";
+import { refreshGmailAccessToken } from "@/lib/gmail-auth";
 
 
 
@@ -243,6 +246,39 @@ export const credentialsRouter = createTRPCRouter({
                 orderBy: {
                     updatedAt: "desc"
                 },
-            })
+        })
+        }),
+
+    testPostgresConnection: protectedProcedure
+        .input(z.object({ credentialId: z.string() }))
+        .mutation(async ({ input, ctx }) => {
+            const credential = await prisma.credential.findFirst({
+                where: { id: input.credentialId, userId: ctx.auth.user.id }
+            });
+            if (!credential) throw new TRPCError({ code: "NOT_FOUND", message: "Credential not found" });
+            const config = JSON.parse(decrypt(credential.value)) as PostgresConnectionConfig;
+            const result = await testConnection(config);
+            if (!result.success) throw new TRPCError({ code: "BAD_REQUEST", message: result.error ?? "Connection failed" });
+            return { latencyMs: result.latencyMs, success: true };
+        }),
+
+    testGmailCredential: protectedProcedure
+        .input(z.object({ credentialId: z.string() }))
+        .mutation(async ({ input, ctx }) => {
+            const credential = await prisma.credential.findUnique({
+                where: { id: input.credentialId, userId: ctx.auth.user.id },
+            });
+            if (!credential) return { ok: false as const, error: "Credential not found" };
+            try {
+                const { token, email } = await refreshGmailAccessToken(credential.id, ctx.auth.user.id);
+                const profileRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/profile", {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                if (!profileRes.ok) return { ok: false as const, error: "Failed to fetch Gmail profile" };
+                const profile = (await profileRes.json()) as { emailAddress?: string };
+                return { ok: true as const, email: profile.emailAddress ?? email };
+            } catch (err) {
+                return { ok: false as const, error: err instanceof Error ? err.message : "Unknown error" };
+            }
         })
 });

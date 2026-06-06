@@ -8,17 +8,14 @@ import { refreshGoogleDriveAccessToken } from "@/lib/google-drive-auth"
 const DRIVE_API = "https://www.googleapis.com/drive/v3"
 const UPLOAD_API = "https://www.googleapis.com/upload/drive/v3"
 
-export const googleDriveExecutor: NodeExecutor = async ({
-  nodeId, context, step, publish, userId,
+export const googleDriveExecutor: NodeExecutor = async ({ data, nodeId, context, step, publish, userId,
 }) => {
   await publish(googleDriveChannel().status({ nodeId, status: "loading" }))
                                                                
   // Load config
-  const config = await step.run(`drive-${nodeId}-load-config`, () =>
-    prisma.googleDriveNode.findUnique({ where: { nodeId } })
-  )
+  const config = data as any;
 
-  if (!config?.credentialId) {
+if (!config?.credentialId) {
     await publish(googleDriveChannel().status({ nodeId, status: "error" }))
     throw new NonRetriableError("Google Drive node is missing credential")
   }

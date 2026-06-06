@@ -4,7 +4,7 @@ import prisma from "@/lib/db";
 import { decrypt } from "@/lib/encryption";
 import { resolveTemplate } from "@/features/executions/lib/template-resolver";
 import { githubChannel } from "@/inngest/channels/github";
-import { GitHubOperation } from "@/generated/prisma";
+import { GitHubOperation } from "@/features/executions/enums"
 import { GitHubClient } from "./api-client";
 import { GitHubNodeData, GitHubConfig } from "./types";
 
@@ -15,8 +15,7 @@ import { executeWorkflowOperations } from "./executors/workflows";
 import { executeUserOrgOperations } from "./executors/users-orgs";
 import { executeSearchMiscOperations } from "./executors/search-misc";
 
-export const githubExecutor: NodeExecutor<GitHubNodeData> = async ({
-  nodeId,
+export const githubExecutor: NodeExecutor<GitHubNodeData> = async ({ data, nodeId,
   context,
   step,
   publish,
@@ -25,11 +24,9 @@ export const githubExecutor: NodeExecutor<GitHubNodeData> = async ({
   await publish(githubChannel().status({ nodeId, status: "loading" }));
 
   // Load config from DB
-  const config = await step.run(`github-${nodeId}-load-config`, async () => {
-    return prisma.gitHubNode.findUnique({ where: { nodeId } });
-  });
+  const config = data as any;
 
-  if (!config) {
+if (!config) {
     await publish(githubChannel().status({ nodeId, status: "error" }));
     throw new NonRetriableError(
       "GitHub node not configured. Open settings to configure."

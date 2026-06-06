@@ -3,7 +3,7 @@ import type { NodeExecutor } from "@/features/executions/types"
 import prisma from "@/lib/db"
 import { resolveTemplate } from "@/features/executions/lib/template-resolver"
 import { gmailChannel } from "@/inngest/channels/gmail"
-import { GmailOperation } from "@/generated/prisma"
+import { GmailOperation } from "@/features/executions/enums"
 import { refreshGmailAccessToken } from "@/lib/gmail-auth"
 import { uploadFromBase64 } from "@/lib/media-service"
 
@@ -246,8 +246,7 @@ function buildRawMessage(opts: {
 
 /* ── Executor ── */
 
-export const gmailExecutor: NodeExecutor<GmailData> = async ({
-  nodeId,
+export const gmailExecutor: NodeExecutor<GmailData> = async ({ data, nodeId,
   context,
   step,
   publish,
@@ -256,11 +255,9 @@ export const gmailExecutor: NodeExecutor<GmailData> = async ({
   await publish(gmailChannel().status({ nodeId, status: "loading" }))
 
   // Step 1: Load config
-  const config = await step.run(`gmail-${nodeId}-load-config`, async () => {
-    return prisma.gmailNode.findUnique({ where: { nodeId } })
-  })
+  const config = data as any;
 
-  if (!config) {
+if (!config) {
     await publish(gmailChannel().status({ nodeId, status: "error" }))
     throw new NonRetriableError(
       "Gmail node not configured. Open settings to configure."

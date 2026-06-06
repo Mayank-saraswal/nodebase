@@ -15,7 +15,7 @@ type OpenAiData = {
     systemPrompt?: string;
 };
 export const openAiExecutor:NodeExecutor<OpenAiData > = async({
-    data,
+  data,
     nodeId,
     context,
     userId,

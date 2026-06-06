@@ -14,37 +14,10 @@ model workflow {
   executions        Execution[]
   webhookTrigger    WebhookTrigger?
   scheduleTrigger   ScheduleTrigger?
-  ifElseNodes       IfElseNode[]
-  gmailNodes        GmailNode[]
-  setVariableNodes  SetVariableNode[]
-  googleSheetsNodes GoogleSheetsNode[]
-  googleDriveNodes  GoogleDriveNode[]
-  codeNodes         CodeNode[]
-  whatsAppNodes     WhatsAppNode[]
-  loopNodes         LoopNode[]
-  notionNodes       NotionNode[]
-  razorpayNodes     RazorpayNode[]
-  slackNodes        SlackNode[]
   gmailWatchers     GmailWatcher[]
-  switchNodes       SwitchNode[]
-  waitNodes         WaitNode[]
-  mergeNodes        MergeNode[]
   errorTriggerNodes ErrorTriggerNode[]
   razorpayTriggers  RazorpayTrigger[]
   whatsappTriggers  WhatsAppTrigger[]
-  msg91Nodes        Msg91Node[]
-  shiprocketNodes   ShiprocketNode[]
-  zohoCrmNodes      ZohoCrmNode[]
-  hubspotNodes      HubspotNode[]
-  freshdeskNodes    FreshdeskNode[]
-  aiNodes           AINode[]
-  mediaUploadNodes  MediaUploadNode[]
-  sortNodes         SortNode[]
-  filterNodes       FilterNode[]
-  cashfreeNodes     CashfreeNode[]
-  aggregateNodes    AggregateNode[]
-  postgresNodes     PostgresNode[]
-  githubNodes       GitHubNode[]
   githubTriggerNodes GitHubTriggerNode[]
   userId            String
   user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -58,26 +31,9 @@ model Credential {
   type            CredentialType
   user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   Node            Node[]
-  shiprocketNodes ShiprocketNode[]
-  zohoCrmNodes    ZohoCrmNode[]
-  hubspotNodes    HubspotNode[]
-  freshdeskNodes  FreshdeskNode[]
-  cashfreeNodes   CashfreeNode[]
-  postgresNodes   PostgresNode[]
-  githubNodes     GitHubNode[]
 
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @default(now()) @updatedAt
-  razorpayNodes     RazorpayNode[]
-  gmailNodes        GmailNode[]
-  googleSheetsNodes GoogleSheetsNode[]
-  googleDriveNodes  GoogleDriveNode[]
-  slackNodes        SlackNode[]
-  whatsAppNodes     WhatsAppNode[]
-  notionNodes       NotionNode[]
-  msg91Nodes        Msg91Node[]
-  ainodes           AINode[]
-  mediaUploadNodes  MediaUploadNode[]
 
   // TODO: @@map("Credenial") has a typo — should be "credential"
   // Fixing requires: ALTER TABLE "Credenial" RENAME TO "credential";

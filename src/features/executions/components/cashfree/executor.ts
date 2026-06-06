@@ -4,7 +4,7 @@ import prisma from "@/lib/db"
 import { decrypt } from "@/lib/encryption"
 import { resolveTemplate } from "@/features/executions/lib/template-resolver"
 import { cashfreeChannel } from "@/inngest/channels/cashfree"
-import { CashfreeOperation } from "@/generated/prisma"
+import { CashfreeOperation } from "@/features/executions/enums"
 
 type CashfreeCredential = {
   clientId: string
@@ -152,14 +152,9 @@ async function cashfreePayoutApi(
   return await res.json() as Record<string, unknown>
 }
 
-export const cashfreeExecutor: NodeExecutor = async ({ nodeId, context, step, publish }) => {
+export const cashfreeExecutor: NodeExecutor = async ({ data, nodeId, context, step, publish }) => {
   // STEP 1 — Load
-  const config = await step.run(`cashfree-${nodeId}-load`, async () =>
-    prisma.cashfreeNode.findUnique({
-      where: { nodeId },
-      include: { credential: true },
-    })
-  )
+  const config = data as any;
 
   // STEP 2 — Validate
   await step.run(`cashfree-${nodeId}-validate`, async () => {

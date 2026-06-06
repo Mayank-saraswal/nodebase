@@ -15,7 +15,7 @@ type DeepseekData = {
     systemPrompt?: string;
 };
 export const deepseekExecutor: NodeExecutor<DeepseekData> = async ({
-    data,
+  data,
     nodeId,
     context,
     step,

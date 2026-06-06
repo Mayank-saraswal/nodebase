@@ -16,7 +16,13 @@ import type { GeneratedWorkflow, WorkflowRefinement, WorkflowNode } from "../sch
 
 const REFINE_SYSTEM = `You are Nodebase AI. The user wants to modify an existing workflow.
 Analyse the current workflow and the user's requested changes, then output a structured modification plan.
-Only change what the user asks. Preserve all other nodes and connections.`;
+Only change what the user asks. Preserve all other nodes and connections.
+
+When adding or modifying nodes, you MUST provide accurate configuration inside the \`data\` object:
+- HTTP_REQUEST: { "endpoint": "https://api.example.com", "method": "GET", "variableName": "httpData", "contentType": "json" }
+- GMAIL: { "operation": "SEND_EMAIL", "variableName": "gmailResult", "toEmail": "user@example.com", "subject": "Update", "body": "Hello" }
+- IF_ELSE: { "field": "httpData.status", "operator": "EQUALS", "value": "success" }
+ALWAYS provide a \`variableName\` for action nodes so their output can be referenced.`;
 
 const DEBUG_SYSTEM = `You are Nodebase AI. Analyse the provided workflow for issues, missing credentials,
 potential failures, and improvement opportunities. Be specific and actionable in your suggestions.`;

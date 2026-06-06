@@ -86,7 +86,7 @@ export const HttpRequestDialog = ({
     resolver: zodResolver(formSchema) as Resolver<HttpRequestFormValues>,
     defaultValues: {
       variableName: defaultValues.variableName ?? "",
-      endpoint: defaultValues.endpoint ?? "",
+      endpoint: defaultValues.endpoint ?? (defaultValues as any).url ?? "",
       method: defaultValues.method ?? "GET",
       body: defaultValues.body ?? "",
       contentType: defaultValues.contentType ?? "json",
@@ -118,7 +118,7 @@ export const HttpRequestDialog = ({
     if (open) {
       form.reset({
         variableName: defaultValues.variableName ?? "",
-        endpoint: defaultValues.endpoint ?? "",
+        endpoint: defaultValues.endpoint ?? (defaultValues as any).url ?? "",
         method: defaultValues.method ?? "GET",
         body: defaultValues.body ?? "",
         contentType: defaultValues.contentType ?? "json",

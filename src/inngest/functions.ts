@@ -308,9 +308,15 @@ export const executeWorkflow = inngest.createFunction(
           let nodeStatus = "success"
           let nodeError = ""
           try {
+            const safeData = (node.data || {}) as Record<string, unknown>;
+            if (!safeData.variableName) {
+              safeData.variableName = `${node.type.toLowerCase()}_${node.id.replace(/-/g, '_')}`;
+            }
+
             context = await executor({
-              data: node.data as Record<string, unknown>,
+              data: safeData,
               nodeId: node.id,
+              credentialId: (node.data as any)?.credentialId || null,
               userId,
               context,
               step,
@@ -390,10 +396,17 @@ export const executeWorkflow = inngest.createFunction(
             let nodeError = ""
             let nodeOutput: Record<string, unknown> = {}
             try {
+              const safeData = (node.data || {}) as Record<string, unknown>;
+              if (!safeData.variableName) {
+                safeData.variableName = `${node.type.toLowerCase()}_${node.id.replace(/-/g, '_')}`;
+              }
+
               nodeOutput = await executor({
-                data: node.data as Record<string, unknown>,
+                data: safeData,
                 nodeId: node.id,
+                credentialId: (node.data as any)?.credentialId || null,
                 userId,
+
                 context: contextSnapshot,
                 step,
                 publish,
@@ -571,6 +584,7 @@ export const executeErrorTriggeredWorkflow = inngest.createFunction(
         context = await executor({
           data: node.data as Record<string, unknown>,
           nodeId: node.id,
+          credentialId: (node.data as any)?.credentialId || null,
           userId,
           context,
           step,
