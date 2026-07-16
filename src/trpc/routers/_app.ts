@@ -16,7 +16,7 @@ import { razorpayTriggerRouter } from '@/server/routers/razorpay-trigger.router'
 import { whatsappTriggerRouter } from '@/server/routers/whatsapp-trigger.router';
 import { githubTriggerRouter } from '@/server/routers/github-trigger.router';
 import { aiAgentRouter } from '@/server/routers/ai-agent.router';
-
+import { integrationsRouter } from '@/features/integrations/server/connect.router';
 
 
 export const appRouter = createTRPCRouter({
@@ -31,6 +31,7 @@ export const appRouter = createTRPCRouter({
   whatsappTrigger: whatsappTriggerRouter,
   githubTrigger: githubTriggerRouter,
   aiAgent: aiAgentRouter,
+  integrations: integrationsRouter,
 });
 // export type definition of API
 export type AppRouter = typeof appRouter;

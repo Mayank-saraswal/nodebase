@@ -1,0 +1,82 @@
+// ─────────────────────────────────────────────────────────────
+// Corsair integration backbone tables (self-hosted SDK)
+// Schema must match Corsair Postgres migration expectations.
+// Pass pg.Pool to createCorsair — not PrismaClient.
+// ─────────────────────────────────────────────────────────────
+
+model CorsairIntegration {
+  id        String   @id
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  name      String
+  config    Json     @default("{}")
+  dek       String?
+  accounts  CorsairAccount[]
+
+  @@map("corsair_integrations")
+}
+
+model CorsairAccount {
+  id            String   @id
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  tenantId      String   @map("tenant_id")
+  integrationId String   @map("integration_id")
+  config        Json     @default("{}")
+  dek           String?
+  integration   CorsairIntegration @relation(fields: [integrationId], references: [id])
+  entities      CorsairEntity[]
+  events        CorsairEvent[]
+
+  @@index([tenantId, integrationId])
+  @@index([tenantId])
+  @@map("corsair_accounts")
+}
+
+model CorsairEntity {
+  id         String   @id
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  accountId  String   @map("account_id")
+  entityId   String   @map("entity_id")
+  entityType String   @map("entity_type")
+  version    String
+  data       Json     @default("{}")
+  account    CorsairAccount @relation(fields: [accountId], references: [id])
+
+  @@index([accountId, entityType, entityId])
+  @@map("corsair_entities")
+}
+
+model CorsairEvent {
+  id        String   @id
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  accountId String   @map("account_id")
+  eventType String   @map("event_type")
+  payload   Json     @default("{}")
+  status    String?
+  account   CorsairAccount @relation(fields: [accountId], references: [id])
+
+  @@index([accountId, createdAt])
+  @@map("corsair_events")
+}
+
+/// Human approval records for gated agent actions (workflow automation uses open mode).
+model CorsairPermission {
+  id        String   @id
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  token     String
+  plugin    String
+  endpoint  String
+  args      String
+  tenantId  String   @default("default") @map("tenant_id")
+  status    String   @default("pending")
+  expiresAt String   @map("expires_at")
+  error     String?
+
+  @@index([token])
+  @@index([tenantId, status])
+  @@map("corsair_permissions")
+}

@@ -6,6 +6,13 @@ import { gmailChannel } from "@/inngest/channels/gmail"
 import { GmailOperation } from "@/features/executions/enums"
 import { refreshGmailAccessToken } from "@/lib/gmail-auth"
 import { uploadFromBase64 } from "@/lib/media-service"
+import {
+  getCorsair,
+  isCorsairPluginEnabled,
+  mapCorsairError,
+  resolveTenantId,
+} from "@/lib/corsair"
+import { gmailAdapter } from "@/features/integrations/adapters/gmail/adapter"
 
 /* ── Types ── */
 
@@ -255,7 +262,7 @@ export const gmailExecutor: NodeExecutor<GmailData> = async ({ data, nodeId,
   await publish(gmailChannel().status({ nodeId, status: "loading" }))
 
   // Step 1: Load config
-  const config = data as any;
+  const config = data as Record<string, unknown>;
 
 if (!config) {
     await publish(gmailChannel().status({ nodeId, status: "error" }))
@@ -264,6 +271,35 @@ if (!config) {
     )
   }
 
+  // ── Corsair backbone path (multi-tenant self-hosted SDK) ──
+  if (isCorsairPluginEnabled("gmail")) {
+    try {
+      const result = await step.run(`gmail-${nodeId}-corsair`, async () => {
+        const tenantId = resolveTenantId({ userId })
+        const client = getCorsair().withTenant(tenantId)
+        return gmailAdapter.run({
+          data: config,
+          context,
+          client,
+          nodeId,
+          userId,
+        })
+      })
+      await publish(gmailChannel().status({ nodeId, status: "success" }))
+      return result as Record<string, unknown>
+    } catch (error) {
+      await publish(gmailChannel().status({ nodeId, status: "error" }))
+      if (
+        error instanceof NonRetriableError ||
+        error instanceof RetryAfterError
+      ) {
+        throw error
+      }
+      mapCorsairError(error, "Gmail")
+    }
+  }
+
+  // ── Legacy path (Cryptr credentials + direct Gmail REST) ──
   // Step 2: Get tokens
   const tokenResult = await step.run(
     `gmail-${nodeId}-get-tokens`,
@@ -284,20 +320,20 @@ if (!config) {
   try {
     result = await step.run(`gmail-${nodeId}-execute`, async () => {
       // Resolve all template fields
-      const to = resolveTemplate(config.to, context)
-      const subject = resolveTemplate(config.subject, context)
-      const body = resolveTemplate(config.body, context)
-      const cc = resolveTemplate(config.cc, context)
-      const bcc = resolveTemplate(config.bcc, context)
-      const replyTo = resolveTemplate(config.replyTo, context)
-      const messageId = resolveTemplate(config.messageId, context)
-      const threadId = resolveTemplate(config.threadId, context)
-      const searchQuery = resolveTemplate(config.searchQuery, context)
-      const labelIds = resolveTemplate(config.labelIds, context)
-      const pageToken = resolveTemplate(config.pageToken, context)
-      const attachmentData = resolveTemplate(config.attachmentData, context)
-      const attachmentName = resolveTemplate(config.attachmentName, context)
-      const attachmentMime = resolveTemplate(config.attachmentMime, context)
+      const to = resolveTemplate(config.to as string, context)
+      const subject = resolveTemplate(config.subject as string, context)
+      const body = resolveTemplate(config.body as string, context)
+      const cc = resolveTemplate(config.cc as string, context)
+      const bcc = resolveTemplate(config.bcc as string, context)
+      const replyTo = resolveTemplate(config.replyTo as string, context)
+      const messageId = resolveTemplate(config.messageId as string, context)
+      const threadId = resolveTemplate(config.threadId as string, context)
+      const searchQuery = resolveTemplate(config.searchQuery as string, context)
+      const labelIds = resolveTemplate(config.labelIds as string, context)
+      const pageToken = resolveTemplate(config.pageToken as string, context)
+      const attachmentData = resolveTemplate(config.attachmentData as string, context)
+      const attachmentName = resolveTemplate(config.attachmentName as string, context)
+      const attachmentMime = resolveTemplate(config.attachmentMime as string, context)
 
       let apiResult: Record<string, unknown> = {}
 
@@ -806,8 +842,8 @@ if (!config) {
 
         /* ── GET_ATTACHMENT ── */
         case GmailOperation.GET_ATTACHMENT: {
-          const attMsgId = resolveTemplate(config.messageId, context)
-          const attId = resolveTemplate(config.attachmentId, context)
+          const attMsgId = resolveTemplate(config.messageId as string, context)
+          const attId = resolveTemplate(config.attachmentId as string, context)
           if (!attMsgId.trim()) {
             throw new NonRetriableError("Gmail GET_ATTACHMENT: messageId is required.")
           }
@@ -910,7 +946,7 @@ if (!config) {
 
         /* ── CREATE_LABEL ── */
         case GmailOperation.CREATE_LABEL: {
-          const labelName = resolveTemplate(config.labelName, context)
+          const labelName = resolveTemplate(config.labelName as string, context)
           if (!labelName.trim()) {
             throw new NonRetriableError("Gmail CREATE_LABEL: labelName is required.")
           }
@@ -957,7 +993,7 @@ if (!config) {
 
         /* ── SEND_DRAFT ── */
         case GmailOperation.SEND_DRAFT: {
-          const sendDraftId = resolveTemplate(config.draftId, context)
+          const sendDraftId = resolveTemplate(config.draftId as string, context)
           if (!sendDraftId.trim()) {
             throw new NonRetriableError("Gmail SEND_DRAFT: draftId is required.")
           }
