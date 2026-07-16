@@ -54,8 +54,8 @@ const PLUGIN_ENV: Record<CorsairPluginId, string> = {
 /** Per-plugin switch. Requires CORSAIR_ENABLED=true as well. */
 export function isCorsairPluginEnabled(plugin: CorsairPluginId): boolean {
   if (!isCorsairEnabled()) return false
-  // Default: when master is on, gmail defaults to true for first cutover; others opt-in
-  const defaultOn = plugin === "gmail"
+  // Default on when master is on for completed adapters; others opt-in
+  const defaultOn = plugin === "gmail" || plugin === "googlesheets"
   return envFlag(PLUGIN_ENV[plugin], defaultOn)
 }
 

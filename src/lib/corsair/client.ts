@@ -1,6 +1,7 @@
 import "server-only"
 import { createCorsair } from "corsair"
 import { gmail } from "@corsair-dev/gmail"
+import { googlesheets } from "@corsair-dev/googlesheets"
 import { getCorsairPool } from "./pool"
 import {
   getAppUrl,
@@ -37,9 +38,11 @@ function buildCorsair() {
       approvalBaseUrl: `${appUrl}/integrations/approve`,
     },
     plugins: [
-      // Register plugins as they are migrated. Gmail is first.
-      // mode: "open" — workflow automation must not block on human approval.
+      // Register plugins as they are migrated. mode: "open" for automation.
       gmail({
+        permissions: { mode: "open" },
+      }),
+      googlesheets({
         permissions: { mode: "open" },
       }),
     ],
