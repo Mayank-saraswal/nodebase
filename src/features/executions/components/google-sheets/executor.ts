@@ -88,17 +88,19 @@ export const googleSheetsExecutor: NodeExecutor<GoogleSheetsData> = async ({ dat
   step,
   publish,
   userId,
+  tenantId: tenantIdParam,
 }) => {
   await publish(
     googleSheetsChannel().status({ nodeId, status: "loading" })
   )
 
   // Step 1: Load config
-  const config = data as Record<string, unknown>;
+  // unknown boundary: node.data is JSON from DB/editor
+  const config = (data ?? {}) as Record<string, unknown>
 
   // ── Corsair backbone path ──
   if (isCorsairPluginEnabled("googlesheets")) {
-    if (!config || !config.spreadsheetId) {
+    if (!config.spreadsheetId) {
       await publish(
         googleSheetsChannel().status({ nodeId, status: "error" }),
       )
@@ -110,7 +112,10 @@ export const googleSheetsExecutor: NodeExecutor<GoogleSheetsData> = async ({ dat
       const result = await step.run(
         `google-sheets-${nodeId}-corsair`,
         async () => {
-          const tenantId = resolveTenantId({ userId })
+          const tenantId =
+            tenantIdParam && tenantIdParam.trim() !== ""
+              ? tenantIdParam
+              : resolveTenantId({ userId })
           const client = getCorsair().withTenant(tenantId)
           return googleSheetsAdapter.run({
             data: config,

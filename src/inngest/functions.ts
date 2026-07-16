@@ -2,10 +2,12 @@
 import { NonRetriableError } from "inngest";
 import { inngest } from "./client";
 import prisma from "@/lib/db";
+import { Prisma } from "@prisma/client";
 import { topologicalSort } from "./utils";
 import { ExecutionStatus, NodeType } from "@/generated/prisma";
 import { getExecutor } from "@/features/executions/lib/executor-registry";
 import { buildExecutionLevels, mergeParallelResults } from "@/features/executions/lib/build-execution-levels";
+import { extractOperation } from "@/features/integrations/registry/node-data";
 import { httpRequestChannel } from "./channels/http-request";
 import { manualTriggerChannel } from "./channels/manual-trigger";
 import { googleformTriggerChannel } from "./channels/google-form-trigger";
@@ -82,6 +84,7 @@ export const executeWorkflow = inngest.createFunction(
           select: {
             id: true,
             workflowId: true,
+            tenantId: true,
           },
         });
       });
@@ -120,9 +123,11 @@ export const executeWorkflow = inngest.createFunction(
           await prisma.nodeExecution.create({
             data: {
               executionId: updatedExecution.id,
+              tenantId: updatedExecution.tenantId,
               nodeId: trigger.nodeId,
               nodeName: "Error Trigger",
               nodeType: "ERROR_TRIGGER",
+              operation: "error_trigger",
               status: "success",
               inputJson: JSON.stringify({
                 error: event.data.error.message,
@@ -202,11 +207,28 @@ export const executeWorkflow = inngest.createFunction(
       throw new NonRetriableError("Inngest event ID or Workflow ID is missing");
     }
 
+    const ownership = await step.run("load-workflow-tenant", async () => {
+      const workflow = await prisma.workflow.findUniqueOrThrow({
+        where: { id: workflowId },
+        select: { userId: true, tenantId: true },
+      });
+      // Phase A: tenantId falls back to userId for rows not yet backfilled
+      const tenantId =
+        workflow.tenantId && workflow.tenantId.trim() !== ""
+          ? workflow.tenantId
+          : workflow.userId;
+      return { userId: workflow.userId, tenantId };
+    });
+
+    const userId = ownership.userId;
+    const tenantId = ownership.tenantId;
+
     const execution = await step.run("create-execution", async () => {
       return await prisma.execution.create({
         data: {
           inngestEventId,
           workflowId,
+          tenantId,
         },
       });
     });
@@ -232,25 +254,21 @@ export const executeWorkflow = inngest.createFunction(
 
     })
 
-    const userId = await step.run("find-user-id", async () => {
-      const workflow = await prisma.workflow.findUniqueOrThrow({
-        where: {
-          id: workflowId,
-        },
-        select: {
-          userId: true
-        }
-      })
-      return workflow.userId;
-    })
-
     //Initialize the context with any initial data from the trigger 
-    let context: Record<string, unknown> = event.data.initialData || {};
+    // unknown: event payload is untyped Inngest JSON
+    const initialRaw: unknown = event.data.initialData;
+    let context: Record<string, unknown> =
+      initialRaw !== null &&
+      typeof initialRaw === "object" &&
+      !Array.isArray(initialRaw)
+        ? { ...(initialRaw as Record<string, unknown>) }
+        : {};
 
     // Inject executionId so media-service can organize blobs by execution
     context = {
       ...context,
       __executionId: executionDbId,
+      __tenantId: tenantId,
     };
 
     // Track nodes to skip due to IF_ELSE branching
@@ -316,8 +334,17 @@ export const executeWorkflow = inngest.createFunction(
             context = await executor({
               data: safeData,
               nodeId: node.id,
-              credentialId: (node.data as any)?.credentialId || null,
+              // unknown: Prisma JsonValue — narrowed via Record check below
+              credentialId: (() => {
+                const d = node.data
+                if (d !== null && typeof d === "object" && !Array.isArray(d)) {
+                  const cred = (d as Record<string, unknown>).credentialId
+                  return typeof cred === "string" ? cred : null
+                }
+                return null
+              })(),
               userId,
+              tenantId,
               context,
               step,
               publish,
@@ -331,13 +358,16 @@ export const executeWorkflow = inngest.createFunction(
             throw err
           } finally {
             nodeOrder++
+            const opName = extractOperation(node.data)
             await step.run(`snapshot-node-${node.id}-${nodeOrder}`, async () => {
               return prisma.nodeExecution.create({
                 data: {
                   executionId: executionDbId,
+                  tenantId,
                   nodeId: node.id,
                   nodeName: node.name,
                   nodeType: node.type,
+                  operation: opName,
                   status: nodeStatus,
                   inputJson: truncateJson(inputSnapshot),
                   outputJson: truncateJson(nodeOutput),
@@ -404,9 +434,17 @@ export const executeWorkflow = inngest.createFunction(
               nodeOutput = await executor({
                 data: safeData,
                 nodeId: node.id,
-                credentialId: (node.data as any)?.credentialId || null,
+                // unknown: Prisma JsonValue — only string credentialId is accepted
+                credentialId: (() => {
+                  const d = node.data
+                  if (d !== null && typeof d === "object" && !Array.isArray(d)) {
+                    const cred = (d as Record<string, unknown>).credentialId
+                    return typeof cred === "string" ? cred : null
+                  }
+                  return null
+                })(),
                 userId,
-
+                tenantId,
                 context: contextSnapshot,
                 step,
                 publish,
@@ -420,13 +458,16 @@ export const executeWorkflow = inngest.createFunction(
               throw err
             } finally {
               nodeOrder++
+              const opName = extractOperation(node.data)
               await step.run(`snapshot-node-${node.id}-${nodeOrder}`, async () => {
                 return prisma.nodeExecution.create({
                   data: {
                     executionId: executionDbId,
+                    tenantId,
                     nodeId: node.id,
                     nodeName: node.name,
                     nodeType: node.type,
+                    operation: opName,
                     status: nodeStatus,
                     inputJson: truncateJson(contextSnapshot),
                     outputJson: truncateJson(nodeOutput),
@@ -494,7 +535,7 @@ export const executeWorkflow = inngest.createFunction(
         data: {
           status: ExecutionStatus.SUCCESS,
           completedAt: new Date(),
-          output: context as any,
+          output: context as never,
         },
       });
     });
@@ -584,7 +625,7 @@ export const executeErrorTriggeredWorkflow = inngest.createFunction(
         context = await executor({
           data: node.data as Record<string, unknown>,
           nodeId: node.id,
-          credentialId: (node.data as any)?.credentialId || null,
+          credentialId: ((node.data as Record<string, unknown> | null)?.credentialId as string) ?? null,
           userId,
           context,
           step,

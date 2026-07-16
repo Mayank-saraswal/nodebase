@@ -2,6 +2,21 @@
 
 Read this file **before** any integration work. It overrides assumptions and prevents architecture drift.
 
+## Architecture law: Option C (mandatory)
+
+Full design: [`docs/architecture/OPTION_C_SCALABLE_MULTI_TENANT.md`](docs/architecture/OPTION_C_SCALABLE_MULTI_TENANT.md)
+
+| Layer | Owns |
+|-------|------|
+| **DB** | Tenants, workflow graph, executions — **not** provider operation catalogs |
+| **Registry (code)** | Op labels, aliases, Zod params, enable flags |
+| **Corsair packages** | Real API surface + auth (source of truth for “what exists”) |
+| **Inngest engine** | Durable graph execution (levels, branch, loop, templates, realtime) |
+
+**Forbidden:** adding new integration operations to `prisma/schema/enums.prisma` (no more `GmailOperation` / `GitHubOperation`-style growth).  
+**Required:** for each shipped `@corsair-dev/*` plugin, registry ops **⊇** Corsair public endpoints (completeness test).  
+**Multi-tenant:** every run and Corsair call uses `resolveTenantId` + `withTenant(tenantId)` (Phase A: `tenantId = userId`).
+
 ## Product identity
 
 | Layer | Role |

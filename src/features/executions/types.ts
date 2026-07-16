@@ -1,15 +1,15 @@
 import type { Realtime } from "@inngest/realtime";
 import { GetStepTools , Inngest } from "inngest";
-
+import type { BaseNodeData } from "./types/index";
 
 export type WorkflowContext = Record<string, unknown>;
 
 export type StepTools = GetStepTools<Inngest.Any>;
 
-export interface WorkflowNode {
+export interface WorkflowNode<TData = BaseNodeData> {
     id: string;
     type: string;
-    data?: Record<string, unknown>;
+    data?: TData;
 }
 
 export interface WorkflowConnection {
@@ -20,17 +20,18 @@ export interface WorkflowConnection {
     toInput?: string;
 }
 
-export interface NodeExecutorParams <TData = Record<string, unknown>>{
+export interface NodeExecutorParams<TData = BaseNodeData> {
     data: TData;
-    nodeId : string;
+    nodeId: string;
     credentialId: string | null;
-    context: WorkflowContext;   
-    step:StepTools;
-    publish:Realtime.PublishFn
-    userId:string;
+    context: WorkflowContext;
+    step: StepTools;
+    publish: Realtime.PublishFn;
+    userId: string;
+    /** Option C multi-tenant isolation key (Phase A: equals userId) */
+    tenantId?: string;
     workflowNodes?: WorkflowNode[];
     workflowConnections?: WorkflowConnection[];
+}
 
-};
-
-export type NodeExecutor<TData = Record<string, unknown>> = (params: NodeExecutorParams<TData>) => Promise<WorkflowContext>;
+export type NodeExecutor<TData = BaseNodeData> = (params: NodeExecutorParams<TData>) => Promise<WorkflowContext>;

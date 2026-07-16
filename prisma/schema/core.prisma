@@ -19,8 +19,14 @@ model workflow {
   razorpayTriggers  RazorpayTrigger[]
   whatsappTriggers  WhatsAppTrigger[]
   githubTriggerNodes GitHubTriggerNode[]
+  /// Owner user (auth). Phase A: same as tenantId.
   userId            String
   user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Multi-tenant isolation key (Option C). Phase A: equals userId. Phase B: workspace id.
+  tenantId          String             @default("") @map("tenant_id")
+
+  @@index([tenantId, updatedAt])
+  @@index([userId])
 }
 
 model Credential {
@@ -78,6 +84,8 @@ model Execution {
   id             String          @id @default(cuid())
   workflowId     String
   workflow       workflow        @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  /// Multi-tenant isolation (Option C). Copied from workflow.tenantId at start.
+  tenantId       String          @default("") @map("tenant_id")
   startedAt      DateTime        @default(now())
   completedAt    DateTime?
   inngestEventId String          @unique
@@ -86,6 +94,9 @@ model Execution {
   errorStack     String?         @db.Text
   status         ExecutionStatus @default(RUNNING)
   nodeExecutions NodeExecution[]
+
+  @@index([tenantId, startedAt])
+  @@index([workflowId, startedAt])
 }
 
 model NodeExecution {
@@ -93,9 +104,14 @@ model NodeExecution {
   executionId String
   execution   Execution @relation(fields: [executionId], references: [id], onDelete: Cascade)
 
+  /// Multi-tenant isolation for query safety
+  tenantId String @default("") @map("tenant_id")
+
   nodeId   String
   nodeName String @default("")
   nodeType String @default("")
+  /// Operation key as string (Option C) — NOT a Prisma op enum. e.g. "SEND" or "messages.send"
+  operation String @default("")
 
   status String @default("success")
 
@@ -113,4 +129,6 @@ model NodeExecution {
   @@index([executionId])
   @@index([nodeId])
   @@index([executionId, executionOrder])
+  @@index([tenantId, createdAt])
+  @@index([nodeType, operation])
 }

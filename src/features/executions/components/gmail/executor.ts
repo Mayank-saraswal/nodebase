@@ -258,13 +258,15 @@ export const gmailExecutor: NodeExecutor<GmailData> = async ({ data, nodeId,
   step,
   publish,
   userId,
+  tenantId: tenantIdParam,
 }) => {
   await publish(gmailChannel().status({ nodeId, status: "loading" }))
 
   // Step 1: Load config
-  const config = data as Record<string, unknown>;
+  // unknown boundary: node.data is JSON from DB/editor
+  const config = (data ?? {}) as Record<string, unknown>
 
-if (!config) {
+if (!config || Object.keys(config).length === 0) {
     await publish(gmailChannel().status({ nodeId, status: "error" }))
     throw new NonRetriableError(
       "Gmail node not configured. Open settings to configure."
@@ -275,7 +277,10 @@ if (!config) {
   if (isCorsairPluginEnabled("gmail")) {
     try {
       const result = await step.run(`gmail-${nodeId}-corsair`, async () => {
-        const tenantId = resolveTenantId({ userId })
+        const tenantId =
+          tenantIdParam && tenantIdParam.trim() !== ""
+            ? tenantIdParam
+            : resolveTenantId({ userId })
         const client = getCorsair().withTenant(tenantId)
         return gmailAdapter.run({
           data: config,
