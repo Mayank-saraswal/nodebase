@@ -54,6 +54,8 @@ export type ResolvedSheetsFields = {
   searchValue: string
   clearRange: string
   newSheetName: string
+  /** Pagination for list spreadsheets */
+  pageToken: string
 }
 
 function asRecord(v: unknown): Record<string, unknown> {
@@ -111,8 +113,19 @@ export async function runGoogleSheetsOperation(
   fields: ResolvedSheetsFields,
 ): Promise<Record<string, unknown>> {
   const api = client.googlesheets.api
+  const op = fields.operation
+
+  // Ops that do not require an existing spreadsheetId
+  const noSpreadsheetRequired =
+    op === GoogleSheetsOp.CREATE_SPREADSHEET ||
+    op === "CREATE_SPREADSHEET" ||
+    op === "spreadsheets.create" ||
+    op === GoogleSheetsOp.LIST_SPREADSHEETS ||
+    op === "LIST_SPREADSHEETS" ||
+    op === "spreadsheets.list"
+
   const spreadsheetId = fields.spreadsheetId.trim()
-  if (!spreadsheetId) {
+  if (!spreadsheetId && !noSpreadsheetRequired) {
     throw new NonRetriableError(
       "Google Sheets: spreadsheetId is required. Open settings and paste the spreadsheet ID.",
     )
@@ -121,11 +134,11 @@ export async function runGoogleSheetsOperation(
   const sheetName = fields.sheetName || "Sheet1"
   const rangeA1 = fields.range || "A:Z"
   const valueInputOption = fields.valueInputOption || "USER_ENTERED"
-  const op = fields.operation
 
   switch (op) {
     case GoogleSheetsOp.READ_ROWS:
-    case "READ_ROWS": {
+    case "READ_ROWS":
+    case "sheets.getRows": {
       const data = await api.sheets.getRows({
         spreadsheetId,
         sheetName,
@@ -564,7 +577,8 @@ export async function runGoogleSheetsOperation(
     }
 
     case GoogleSheetsOp.GET_SHEET_INFO:
-    case "GET_SHEET_INFO": {
+    case "GET_SHEET_INFO":
+    case "sheets.listSheetsInSpreadsheet": {
       const listed = await api.sheets.listSheetsInSpreadsheet({
         spreadsheetId,
       })
@@ -593,6 +607,132 @@ export async function runGoogleSheetsOperation(
         sheets: infoSheets,
         sheetCount: infoSheets.length,
         spreadsheetId,
+      }
+    }
+
+    case GoogleSheetsOp.APPEND_OR_UPDATE_ROW:
+    case "APPEND_OR_UPDATE_ROW":
+    case "sheets.appendOrUpdateRow": {
+      if (!fields.matchColumn.trim() || fields.matchValue === undefined) {
+        throw new NonRetriableError(
+          "Google Sheets APPEND_OR_UPDATE_ROW: matchColumn and matchValue are required.",
+        )
+      }
+      let values: (string | number | boolean | null)[]
+      if (fields.rowValues?.trim()) {
+        const parsed = parseJsonField(
+          fields.rowValues,
+          "APPEND_OR_UPDATE_ROW",
+          'Expected object or array of cell values',
+        )
+        if (Array.isArray(parsed)) {
+          values = parsed.map((v) =>
+            v === null || v === undefined ? null : String(v),
+          )
+        } else {
+          const headers = await getHeaders(api, spreadsheetId, sheetName)
+          values = (parseValuesInput(parsed, headers, "APPEND_OR_UPDATE_ROW")[0] ??
+            []) as string[]
+        }
+      } else if (fields.rowData?.length) {
+        values = fields.rowData.map((c) => String(c.value ?? ""))
+      } else {
+        throw new NonRetriableError(
+          "Google Sheets APPEND_OR_UPDATE_ROW: provide rowValues or rowData.",
+        )
+      }
+      const result = await api.sheets.appendOrUpdateRow({
+        spreadsheetId,
+        sheetName,
+        keyColumn: fields.matchColumn,
+        keyValue: fields.matchValue,
+        values,
+        valueInputOption,
+        insertDataOption: "INSERT_ROWS",
+      })
+      return {
+        operation: "APPEND_OR_UPDATE_ROW",
+        result,
+        matchColumn: fields.matchColumn,
+        matchValue: fields.matchValue,
+        spreadsheetId,
+      }
+    }
+
+    case GoogleSheetsOp.DELETE_SHEET:
+    case "DELETE_SHEET":
+    case "sheets.deleteSheet": {
+      const sheetId = await resolveSheetId(api, spreadsheetId, sheetName)
+      const result = await api.sheets.deleteSheet({
+        spreadsheetId,
+        sheetId,
+      })
+      return {
+        operation: "DELETE_SHEET",
+        success: true,
+        sheetId,
+        sheetName,
+        spreadsheetId,
+        result,
+      }
+    }
+
+    case GoogleSheetsOp.CREATE_SPREADSHEET:
+    case "CREATE_SPREADSHEET":
+    case "spreadsheets.create": {
+      const title =
+        fields.newSheetName.trim() ||
+        fields.sheetName.trim() ||
+        "Untitled Spreadsheet"
+      const created = await api.spreadsheets.create({
+        properties: { title },
+      })
+      return {
+        operation: "CREATE_SPREADSHEET",
+        spreadsheetId: created.spreadsheetId ?? created.id,
+        title:
+          (asRecord(created.properties).title as string | undefined) ?? title,
+        spreadsheetUrl: created.spreadsheetUrl ?? null,
+      }
+    }
+
+    case GoogleSheetsOp.DELETE_SPREADSHEET:
+    case "DELETE_SPREADSHEET":
+    case "spreadsheets.delete": {
+      if (!spreadsheetId) {
+        throw new NonRetriableError(
+          "Google Sheets DELETE_SPREADSHEET: spreadsheetId is required.",
+        )
+      }
+      await api.spreadsheets.delete({ spreadsheetId })
+      return {
+        operation: "DELETE_SPREADSHEET",
+        spreadsheetId,
+        deleted: true,
+      }
+    }
+
+    case GoogleSheetsOp.LIST_SPREADSHEETS:
+    case "LIST_SPREADSHEETS":
+    case "spreadsheets.list": {
+      const listed = await api.spreadsheets.list({
+        pageSize: fields.maxResults || 50,
+        pageToken: fields.pageToken?.trim() || undefined,
+        query: fields.searchValue?.trim() || undefined,
+      })
+      const files =
+        (listed.files as Array<Record<string, unknown>> | undefined) ??
+        (listed.spreadsheets as Array<Record<string, unknown>> | undefined) ??
+        []
+      return {
+        operation: "LIST_SPREADSHEETS",
+        spreadsheets: files.map((f) => ({
+          spreadsheetId: f.id ?? f.spreadsheetId,
+          name: f.name ?? asRecord(f.properties).title,
+          modifiedTime: f.modifiedTime ?? null,
+        })),
+        count: files.length,
+        nextPageToken: (listed.nextPageToken as string) ?? null,
       }
     }
 

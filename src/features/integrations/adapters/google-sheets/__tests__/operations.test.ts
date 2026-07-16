@@ -28,6 +28,7 @@ function fields(
     searchValue: "",
     clearRange: "",
     newSheetName: "",
+    pageToken: "",
     ...overrides,
   }
 }

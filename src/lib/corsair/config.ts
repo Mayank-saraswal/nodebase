@@ -55,7 +55,10 @@ const PLUGIN_ENV: Record<CorsairPluginId, string> = {
 export function isCorsairPluginEnabled(plugin: CorsairPluginId): boolean {
   if (!isCorsairEnabled()) return false
   // Default on when master is on for completed adapters; others opt-in
-  const defaultOn = plugin === "gmail" || plugin === "googlesheets"
+  const defaultOn =
+    plugin === "gmail" ||
+    plugin === "googlesheets" ||
+    plugin === "googledrive"
   return envFlag(PLUGIN_ENV[plugin], defaultOn)
 }
 

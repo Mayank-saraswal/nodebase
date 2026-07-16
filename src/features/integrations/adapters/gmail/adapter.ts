@@ -50,9 +50,11 @@ export const gmailAdapter: IntegrationAdapter = {
       bcc: t(config.bcc as string, context),
       replyTo: t(config.replyTo as string, context),
       messageId: t(config.messageId as string, context),
+      messageIds: t(config.messageIds as string, context),
       threadId: t(config.threadId as string, context),
       searchQuery: t(config.searchQuery as string, context),
       labelIds: t(config.labelIds as string, context),
+      labelId: t(config.labelId as string, context),
       pageToken: t(config.pageToken as string, context),
       attachmentData: t(config.attachmentData as string, context),
       attachmentName: t(config.attachmentName as string, context),
@@ -66,8 +68,13 @@ export const gmailAdapter: IntegrationAdapter = {
       maxResults: num(config.maxResults, 10),
       attachmentOutputFormat: String(config.attachmentOutputFormat || "base64"),
       userId,
-      workflowId: config.workflowId as string | undefined,
-      executionId: (context.__executionId as string) ?? undefined,
+      workflowId:
+        typeof config.workflowId === "string" ? config.workflowId : undefined,
+      // unknown: context bag is free-form workflow state
+      executionId:
+        typeof context.__executionId === "string"
+          ? context.__executionId
+          : undefined,
     }
 
     let apiResult: Record<string, unknown>

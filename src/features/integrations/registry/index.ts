@@ -2,6 +2,7 @@ import { NodeType } from "@/generated/prisma"
 import type { CorsairPluginId } from "@/lib/corsair/config"
 import { gmailIntegrationDefinition } from "./integrations/gmail"
 import { googleSheetsIntegrationDefinition } from "./integrations/google-sheets"
+import { googleDriveIntegrationDefinition } from "./integrations/google-drive"
 import { resolveOperation, buildAliasMap, listOperationKeys } from "./resolve"
 import type { IntegrationDefinition } from "./types"
 
@@ -19,6 +20,7 @@ export {
 const BY_TYPE_KEY: Record<string, IntegrationDefinition> = {
   gmail: gmailIntegrationDefinition,
   google_sheets: googleSheetsIntegrationDefinition,
+  google_drive: googleDriveIntegrationDefinition,
 }
 
 /** Map Prisma NodeType → registry typeKey */
@@ -107,4 +109,8 @@ export function getCorsairPluginForNode(
   return NODE_TYPE_TO_CORSAIR_PLUGIN[type]
 }
 
-export { gmailIntegrationDefinition, googleSheetsIntegrationDefinition }
+export {
+  gmailIntegrationDefinition,
+  googleSheetsIntegrationDefinition,
+  googleDriveIntegrationDefinition,
+}

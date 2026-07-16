@@ -38,15 +38,15 @@ export const googleSheetsAdapter: IntegrationAdapter = {
     }
 
     const spreadsheetId = t(config.spreadsheetId as string, context)
-    if (!spreadsheetId.trim()) {
-      throw new NonRetriableError(
-        "Google Sheets: spreadsheetId is required.",
-      )
-    }
 
     // Resolve rowData column values with templates
-    const rawRowData =
-      (config.rowData as Array<{ column: string; value: string }>) ?? []
+    // unknown: rowData is free-form JSON array from node config
+    const rawRowDataUnknown = config.rowData
+    const rawRowData: Array<{ column: string; value: string }> = Array.isArray(
+      rawRowDataUnknown,
+    )
+      ? (rawRowDataUnknown as Array<{ column: string; value: string }>)
+      : []
     const rowData = rawRowData.map((c) => ({
       column: c.column,
       value: t(c.value, context),
@@ -71,6 +71,7 @@ export const googleSheetsAdapter: IntegrationAdapter = {
       searchValue: t(config.searchValue as string, context),
       clearRange: t(config.clearRange as string, context),
       newSheetName: t(config.newSheetName as string, context),
+      pageToken: t(config.pageToken as string, context),
     }
 
     let apiResult: Record<string, unknown>

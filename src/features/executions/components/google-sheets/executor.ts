@@ -6,12 +6,11 @@ import { googleSheetsChannel } from "@/inngest/channels/google-sheets"
 import { GoogleSheetsOp } from "@/features/executions/enums"
 import { refreshGoogleSheetsAccessToken } from "@/lib/google-sheets-auth"
 import {
-  getCorsair,
-  isCorsairPluginEnabled,
   mapCorsairError,
   resolveTenantId,
 } from "@/lib/corsair"
-import { googleSheetsAdapter } from "@/features/integrations/adapters/google-sheets/adapter"
+import { tryRunIntegration } from "@/features/integrations/runner"
+import { NodeType } from "@/generated/prisma"
 
 const SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets"
 
@@ -98,38 +97,32 @@ export const googleSheetsExecutor: NodeExecutor<GoogleSheetsData> = async ({ dat
   // unknown boundary: node.data is JSON from DB/editor
   const config = (data ?? {}) as Record<string, unknown>
 
-  // ── Corsair backbone path ──
-  if (isCorsairPluginEnabled("googlesheets")) {
-    if (!config.spreadsheetId) {
-      await publish(
-        googleSheetsChannel().status({ nodeId, status: "error" }),
-      )
-      throw new NonRetriableError(
-        "Google Sheets node not configured. Set spreadsheet ID in settings.",
-      )
-    }
+  // ── Corsair backbone path (Option C generic runner) ──
+  {
+    const tenantId =
+      tenantIdParam && tenantIdParam.trim() !== ""
+        ? tenantIdParam
+        : resolveTenantId({ userId })
     try {
-      const result = await step.run(
+      const corsairResult = await step.run(
         `google-sheets-${nodeId}-corsair`,
         async () => {
-          const tenantId =
-            tenantIdParam && tenantIdParam.trim() !== ""
-              ? tenantIdParam
-              : resolveTenantId({ userId })
-          const client = getCorsair().withTenant(tenantId)
-          return googleSheetsAdapter.run({
+          return tryRunIntegration({
+            nodeType: NodeType.GOOGLE_SHEETS,
             data: config,
             context,
-            client,
             nodeId,
             userId,
+            tenantId,
           })
         },
       )
-      await publish(
-        googleSheetsChannel().status({ nodeId, status: "success" }),
-      )
-      return result as Record<string, unknown>
+      if (corsairResult) {
+        await publish(
+          googleSheetsChannel().status({ nodeId, status: "success" }),
+        )
+        return corsairResult.context
+      }
     } catch (error) {
       await publish(
         googleSheetsChannel().status({ nodeId, status: "error" }),

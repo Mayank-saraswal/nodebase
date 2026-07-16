@@ -1,11 +1,17 @@
 /**
- * Gmail Corsair operations — Nodebase GmailOperation → @corsair-dev/gmail API.
+ * Gmail Corsair operations — Nodebase product ops + full @corsair-dev/gmail surface.
  * Client shape: tenant.gmail.api.messages|labels|drafts|threads
+ *
+ * Ops are resolved via Option C registry (aliases → canonical), then dispatched.
+ * Completeness: every Corsair public endpoint has a registry entry + case here
+ * (except product-only helpers like REPLY/FORWARD/GET_ATTACHMENT).
  */
 
 import { NonRetriableError } from "inngest"
 import { GmailOperation } from "@/features/executions/enums"
 import { uploadFromBase64 } from "@/lib/media-service"
+import { gmailIntegrationDefinition } from "@/features/integrations/registry/integrations/gmail"
+import { resolveOperation } from "@/features/integrations/registry/resolve"
 import {
   buildRawMessage,
   escapeHtml,
@@ -22,20 +28,34 @@ export type GmailApiClient = {
         list: (args: Record<string, unknown>) => Promise<Record<string, unknown>>
         get: (args: Record<string, unknown>) => Promise<Record<string, unknown>>
         send: (args: Record<string, unknown>) => Promise<Record<string, unknown>>
+        delete: (args: Record<string, unknown>) => Promise<void>
         modify: (args: Record<string, unknown>) => Promise<Record<string, unknown>>
+        batchModify: (args: Record<string, unknown>) => Promise<void>
         trash: (args: Record<string, unknown>) => Promise<Record<string, unknown>>
+        untrash: (args: Record<string, unknown>) => Promise<Record<string, unknown>>
       }
       labels: {
         list: (args?: Record<string, unknown>) => Promise<Record<string, unknown>>
+        get: (args: Record<string, unknown>) => Promise<Record<string, unknown>>
         create: (args: Record<string, unknown>) => Promise<Record<string, unknown>>
+        update: (args: Record<string, unknown>) => Promise<Record<string, unknown>>
+        delete: (args: Record<string, unknown>) => Promise<void>
       }
       drafts: {
         list: (args?: Record<string, unknown>) => Promise<Record<string, unknown>>
+        get: (args: Record<string, unknown>) => Promise<Record<string, unknown>>
         create: (args: Record<string, unknown>) => Promise<Record<string, unknown>>
+        update: (args: Record<string, unknown>) => Promise<Record<string, unknown>>
+        delete: (args: Record<string, unknown>) => Promise<void>
         send: (args: Record<string, unknown>) => Promise<Record<string, unknown>>
       }
       threads: {
+        list: (args?: Record<string, unknown>) => Promise<Record<string, unknown>>
         get: (args: Record<string, unknown>) => Promise<Record<string, unknown>>
+        modify: (args: Record<string, unknown>) => Promise<Record<string, unknown>>
+        delete: (args: Record<string, unknown>) => Promise<void>
+        trash: (args: Record<string, unknown>) => Promise<Record<string, unknown>>
+        untrash: (args: Record<string, unknown>) => Promise<Record<string, unknown>>
       }
     }
   }
@@ -50,9 +70,13 @@ export type ResolvedGmailFields = {
   bcc: string
   replyTo: string
   messageId: string
+  /** Comma-separated ids for batchModify */
+  messageIds: string
   threadId: string
   searchQuery: string
   labelIds: string
+  /** Single label id for get/update/delete label */
+  labelId: string
   pageToken: string
   attachmentData: string
   attachmentName: string
@@ -68,6 +92,26 @@ export type ResolvedGmailFields = {
   userId: string
   workflowId?: string
   executionId?: string
+}
+
+/**
+ * Map any product alias or Corsair path to a stable product key for the switch.
+ * Registry is the source of truth for allowed ops.
+ *
+ * When the caller used a product alias (e.g. SEARCH_MESSAGES vs LIST_MESSAGES),
+ * keep that alias so product-specific validation still runs even if both map
+ * to the same Corsair path.
+ */
+function normalizeGmailOp(raw: string): string {
+  const { operation, requestedKey } = resolveOperation(
+    gmailIntegrationDefinition,
+    raw,
+  )
+  if (operation.aliases?.includes(requestedKey)) {
+    return requestedKey
+  }
+  // Canonical Corsair path → first product alias for switch cases
+  return operation.aliases?.[0] ?? operation.key
 }
 
 function splitLabels(labelIds: string): string[] {
@@ -138,11 +182,13 @@ export async function runGmailOperation(
   fields: ResolvedGmailFields,
 ): Promise<Record<string, unknown>> {
   const api = client.gmail.api
-  const op = fields.operation
+  // Registry validates + normalizes aliases / Corsair paths
+  const op = normalizeGmailOp(fields.operation)
 
   switch (op) {
     case GmailOperation.SEND:
-    case "SEND": {
+    case "SEND":
+    case "messages.send": {
       if (!fields.to.trim()) {
         throw new NonRetriableError(
           `Gmail: 'To' field resolved to empty string.`,
@@ -713,7 +759,285 @@ export async function runGmailOperation(
       }
     }
 
+    // ── Full Corsair surface (ops beyond original product set) ──
+
+    case GmailOperation.DELETE_MESSAGE:
+    case "DELETE_MESSAGE": {
+      if (!fields.messageId.trim()) {
+        throw new NonRetriableError(
+          "Gmail DELETE_MESSAGE: messageId is required. Permanent delete — prefer MOVE_TO_TRASH.",
+        )
+      }
+      await api.messages.delete({ id: fields.messageId })
+      return {
+        messageId: fields.messageId,
+        deleted: true,
+        permanent: true,
+      }
+    }
+
+    case GmailOperation.BATCH_MODIFY:
+    case "BATCH_MODIFY": {
+      const ids = fields.messageIds.trim()
+        ? splitLabels(fields.messageIds)
+        : fields.messageId.trim()
+          ? [fields.messageId.trim()]
+          : []
+      if (ids.length === 0) {
+        throw new NonRetriableError(
+          "Gmail BATCH_MODIFY: messageIds (comma-separated) or messageId is required.",
+        )
+      }
+      const addLabelIds = fields.labelIds.trim()
+        ? splitLabels(fields.labelIds)
+        : undefined
+      // removeLabelIds can reuse labelName as a single remove, or empty
+      await api.messages.batchModify({
+        ids,
+        addLabelIds,
+        removeLabelIds: fields.labelName.trim()
+          ? [fields.labelName.trim()]
+          : undefined,
+      })
+      return {
+        messageIds: ids,
+        count: ids.length,
+        addLabelIds: addLabelIds ?? [],
+        batchModified: true,
+      }
+    }
+
+    case GmailOperation.UNTRASH_MESSAGE:
+    case "UNTRASH_MESSAGE": {
+      if (!fields.messageId.trim()) {
+        throw new NonRetriableError(
+          "Gmail UNTRASH_MESSAGE: messageId is required.",
+        )
+      }
+      const restored = await api.messages.untrash({ id: fields.messageId })
+      return {
+        messageId: restored.id,
+        threadId: restored.threadId,
+        labelIds: restored.labelIds,
+        untrashed: true,
+      }
+    }
+
+    case GmailOperation.GET_DRAFT:
+    case "GET_DRAFT": {
+      if (!fields.draftId.trim()) {
+        throw new NonRetriableError("Gmail GET_DRAFT: draftId is required.")
+      }
+      const draft = await api.drafts.get({
+        id: fields.draftId,
+        format: fields.includeBody ? "full" : "metadata",
+      })
+      const draftMessage = asRecord(draft.message)
+      return {
+        draftId: draft.id,
+        messageId: draftMessage.id,
+        threadId: draftMessage.threadId,
+        message: fields.includeBody
+          ? formatMessageSummary(draftMessage, true)
+          : undefined,
+      }
+    }
+
+    case GmailOperation.UPDATE_DRAFT:
+    case "UPDATE_DRAFT": {
+      if (!fields.draftId.trim()) {
+        throw new NonRetriableError("Gmail UPDATE_DRAFT: draftId is required.")
+      }
+      if (!fields.to.trim()) {
+        throw new NonRetriableError(
+          "Gmail UPDATE_DRAFT: 'To' is required to rebuild the draft message.",
+        )
+      }
+      const raw = buildRawMessage({
+        to: fields.to,
+        subject: fields.subject,
+        body: fields.body,
+        isHtml: fields.isHtml,
+        cc: fields.cc || undefined,
+        bcc: fields.bcc || undefined,
+        replyTo: fields.replyTo || undefined,
+        attachmentData: fields.attachmentData || undefined,
+        attachmentName: fields.attachmentName || undefined,
+        attachmentMime: fields.attachmentMime || undefined,
+      })
+      const updated = await api.drafts.update({
+        id: fields.draftId,
+        draft: {
+          message: {
+            raw,
+            threadId: fields.threadId || undefined,
+          },
+        },
+      })
+      const draftMessage = asRecord(updated.message)
+      return {
+        draftId: updated.id,
+        messageId: draftMessage.id,
+        threadId: draftMessage.threadId,
+        updated: true,
+      }
+    }
+
+    case GmailOperation.DELETE_DRAFT:
+    case "DELETE_DRAFT": {
+      if (!fields.draftId.trim()) {
+        throw new NonRetriableError("Gmail DELETE_DRAFT: draftId is required.")
+      }
+      await api.drafts.delete({ id: fields.draftId })
+      return { draftId: fields.draftId, deleted: true }
+    }
+
+    case GmailOperation.LIST_THREADS:
+    case "LIST_THREADS": {
+      const listArgs: Record<string, unknown> = {
+        maxResults: fields.maxResults || 10,
+      }
+      if (fields.searchQuery.trim()) listArgs.q = fields.searchQuery
+      if (fields.labelIds.trim()) {
+        listArgs.labelIds = splitLabels(fields.labelIds)
+      }
+      if (fields.pageToken.trim()) listArgs.pageToken = fields.pageToken
+      const list = await api.threads.list(listArgs)
+      const rawThreads =
+        (list.threads as Array<Record<string, unknown>>) ?? []
+      return {
+        threads: rawThreads.map((t) => ({
+          threadId: t.id,
+          snippet: t.snippet,
+          historyId: t.historyId,
+        })),
+        count: rawThreads.length,
+        nextPageToken: (list.nextPageToken as string) ?? null,
+        resultSizeEstimate: list.resultSizeEstimate ?? null,
+      }
+    }
+
+    case GmailOperation.MODIFY_THREAD:
+    case "MODIFY_THREAD": {
+      if (!fields.threadId.trim()) {
+        throw new NonRetriableError("Gmail MODIFY_THREAD: threadId is required.")
+      }
+      if (!fields.labelIds.trim()) {
+        throw new NonRetriableError(
+          "Gmail MODIFY_THREAD: labelIds (to add) is required. Put remove ids in labelName as single id or leave empty.",
+        )
+      }
+      const modified = await api.threads.modify({
+        id: fields.threadId,
+        addLabelIds: splitLabels(fields.labelIds),
+        removeLabelIds: fields.labelName.trim()
+          ? splitLabels(fields.labelName)
+          : undefined,
+      })
+      return {
+        threadId: modified.id,
+        labelIds: modified.labelIds,
+        modified: true,
+      }
+    }
+
+    case GmailOperation.DELETE_THREAD:
+    case "DELETE_THREAD": {
+      if (!fields.threadId.trim()) {
+        throw new NonRetriableError("Gmail DELETE_THREAD: threadId is required.")
+      }
+      await api.threads.delete({ id: fields.threadId })
+      return { threadId: fields.threadId, deleted: true, permanent: true }
+    }
+
+    case GmailOperation.TRASH_THREAD:
+    case "TRASH_THREAD": {
+      if (!fields.threadId.trim()) {
+        throw new NonRetriableError("Gmail TRASH_THREAD: threadId is required.")
+      }
+      const trashed = await api.threads.trash({ id: fields.threadId })
+      return {
+        threadId: trashed.id,
+        labelIds: trashed.labelIds,
+        trashed: true,
+      }
+    }
+
+    case GmailOperation.UNTRASH_THREAD:
+    case "UNTRASH_THREAD": {
+      if (!fields.threadId.trim()) {
+        throw new NonRetriableError(
+          "Gmail UNTRASH_THREAD: threadId is required.",
+        )
+      }
+      const restored = await api.threads.untrash({ id: fields.threadId })
+      return {
+        threadId: restored.id,
+        labelIds: restored.labelIds,
+        untrashed: true,
+      }
+    }
+
+    case GmailOperation.GET_LABEL:
+    case "GET_LABEL": {
+      const id = fields.labelId.trim() || fields.labelIds.trim()
+      if (!id) {
+        throw new NonRetriableError(
+          "Gmail GET_LABEL: labelId (or labelIds) is required.",
+        )
+      }
+      const label = await api.labels.get({ id: splitLabels(id)[0] })
+      return {
+        labelId: label.id,
+        name: label.name,
+        type: label.type,
+        messagesTotal: label.messagesTotal,
+        messagesUnread: label.messagesUnread,
+        threadsTotal: label.threadsTotal,
+        threadsUnread: label.threadsUnread,
+      }
+    }
+
+    case GmailOperation.UPDATE_LABEL:
+    case "UPDATE_LABEL": {
+      const id = fields.labelId.trim() || fields.labelIds.trim()
+      if (!id) {
+        throw new NonRetriableError("Gmail UPDATE_LABEL: labelId is required.")
+      }
+      if (!fields.labelName.trim()) {
+        throw new NonRetriableError(
+          "Gmail UPDATE_LABEL: labelName (new name) is required.",
+        )
+      }
+      const label = await api.labels.update({
+        id: splitLabels(id)[0],
+        label: {
+          name: fields.labelName,
+          labelListVisibility: "labelShow",
+          messageListVisibility: "show",
+        },
+      })
+      return {
+        labelId: label.id,
+        name: label.name,
+        type: label.type,
+        updated: true,
+      }
+    }
+
+    case GmailOperation.DELETE_LABEL:
+    case "DELETE_LABEL": {
+      const id = fields.labelId.trim() || fields.labelIds.trim()
+      if (!id) {
+        throw new NonRetriableError("Gmail DELETE_LABEL: labelId is required.")
+      }
+      await api.labels.delete({ id: splitLabels(id)[0] })
+      return { labelId: splitLabels(id)[0], deleted: true }
+    }
+
     default:
-      throw new NonRetriableError(`Unknown Gmail operation: ${op}`)
+      throw new NonRetriableError(
+        `Unknown Gmail operation: ${fields.operation} (normalized: ${op})`,
+      )
   }
 }

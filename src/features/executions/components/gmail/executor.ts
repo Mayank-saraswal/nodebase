@@ -7,12 +7,11 @@ import { GmailOperation } from "@/features/executions/enums"
 import { refreshGmailAccessToken } from "@/lib/gmail-auth"
 import { uploadFromBase64 } from "@/lib/media-service"
 import {
-  getCorsair,
-  isCorsairPluginEnabled,
   mapCorsairError,
   resolveTenantId,
 } from "@/lib/corsair"
-import { gmailAdapter } from "@/features/integrations/adapters/gmail/adapter"
+import { tryRunIntegration } from "@/features/integrations/runner"
+import { NodeType } from "@/generated/prisma"
 
 /* ── Types ── */
 
@@ -273,25 +272,30 @@ if (!config || Object.keys(config).length === 0) {
     )
   }
 
-  // ── Corsair backbone path (multi-tenant self-hosted SDK) ──
-  if (isCorsairPluginEnabled("gmail")) {
+  // ── Corsair backbone path (Option C generic runner + multi-tenant) ──
+  {
+    const tenantId =
+      tenantIdParam && tenantIdParam.trim() !== ""
+        ? tenantIdParam
+        : resolveTenantId({ userId })
     try {
-      const result = await step.run(`gmail-${nodeId}-corsair`, async () => {
-        const tenantId =
-          tenantIdParam && tenantIdParam.trim() !== ""
-            ? tenantIdParam
-            : resolveTenantId({ userId })
-        const client = getCorsair().withTenant(tenantId)
-        return gmailAdapter.run({
-          data: config,
-          context,
-          client,
-          nodeId,
-          userId,
-        })
-      })
-      await publish(gmailChannel().status({ nodeId, status: "success" }))
-      return result as Record<string, unknown>
+      const corsairResult = await step.run(
+        `gmail-${nodeId}-corsair`,
+        async () => {
+          return tryRunIntegration({
+            nodeType: NodeType.GMAIL,
+            data: config,
+            context,
+            nodeId,
+            userId,
+            tenantId,
+          })
+        },
+      )
+      if (corsairResult) {
+        await publish(gmailChannel().status({ nodeId, status: "success" }))
+        return corsairResult.context
+      }
     } catch (error) {
       await publish(gmailChannel().status({ nodeId, status: "error" }))
       if (

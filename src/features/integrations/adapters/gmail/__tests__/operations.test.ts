@@ -18,9 +18,11 @@ function baseFields(
     bcc: "",
     replyTo: "",
     messageId: "",
+    messageIds: "",
     threadId: "",
     searchQuery: "",
     labelIds: "",
+    labelId: "",
     pageToken: "",
     attachmentData: "",
     attachmentName: "",
@@ -75,15 +77,22 @@ function mockClient(overrides?: {
             threadId: "t1",
             labelIds: ["SENT"],
           }),
+          delete: vi.fn().mockResolvedValue(undefined),
           modify: vi.fn().mockResolvedValue({
             id: "m1",
             threadId: "t1",
             labelIds: ["INBOX"],
           }),
+          batchModify: vi.fn().mockResolvedValue(undefined),
           trash: vi.fn().mockResolvedValue({
             id: "m1",
             threadId: "t1",
             labelIds: ["TRASH"],
+          }),
+          untrash: vi.fn().mockResolvedValue({
+            id: "m1",
+            threadId: "t1",
+            labelIds: ["INBOX"],
           }),
           ...overrides?.messages,
         },
@@ -94,25 +103,50 @@ function mockClient(overrides?: {
               { id: "L1", name: "Custom", type: "user" },
             ],
           }),
+          get: vi.fn().mockResolvedValue({
+            id: "L1",
+            name: "Custom",
+            type: "user",
+            messagesTotal: 3,
+          }),
           create: vi.fn().mockResolvedValue({
             id: "L2",
             name: "New",
             type: "user",
           }),
+          update: vi.fn().mockResolvedValue({
+            id: "L1",
+            name: "Renamed",
+            type: "user",
+          }),
+          delete: vi.fn().mockResolvedValue(undefined),
           ...overrides?.labels,
         },
         drafts: {
           list: vi.fn().mockResolvedValue({
             drafts: [{ id: "d1", message: { id: "m9", threadId: "t9" } }],
           }),
+          get: vi.fn().mockResolvedValue({
+            id: "d1",
+            message: { id: "m9", threadId: "t9" },
+          }),
           create: vi.fn().mockResolvedValue({
             id: "d1",
             message: { id: "m9", threadId: "t9" },
           }),
+          update: vi.fn().mockResolvedValue({
+            id: "d1",
+            message: { id: "m9", threadId: "t9" },
+          }),
+          delete: vi.fn().mockResolvedValue(undefined),
           send: vi.fn().mockResolvedValue({ id: "sent_d", threadId: "t9" }),
           ...overrides?.drafts,
         },
         threads: {
+          list: vi.fn().mockResolvedValue({
+            threads: [{ id: "t1", snippet: "s" }],
+            resultSizeEstimate: 1,
+          }),
           get: vi.fn().mockResolvedValue({
             id: "t1",
             snippet: "thread",
@@ -131,6 +165,19 @@ function mockClient(overrides?: {
                 },
               },
             ],
+          }),
+          modify: vi.fn().mockResolvedValue({
+            id: "t1",
+            labelIds: ["INBOX"],
+          }),
+          delete: vi.fn().mockResolvedValue(undefined),
+          trash: vi.fn().mockResolvedValue({
+            id: "t1",
+            labelIds: ["TRASH"],
+          }),
+          untrash: vi.fn().mockResolvedValue({
+            id: "t1",
+            labelIds: ["INBOX"],
           }),
           ...overrides?.threads,
         },
@@ -421,12 +468,65 @@ describe("runGmailOperation (all Nodebase ops)", () => {
     expect(out.messageId).toBe("sent_d")
   })
 
-  it("unknown op throws", async () => {
+  it("DELETE_MESSAGE permanent delete", async () => {
+    const out = await runGmailOperation(
+      client,
+      baseFields({
+        operation: GmailOperation.DELETE_MESSAGE,
+        messageId: "m1",
+      }),
+    )
+    expect(client.gmail.api.messages.delete).toHaveBeenCalledWith({ id: "m1" })
+    expect(out.deleted).toBe(true)
+  })
+
+  it("UNTRASH_MESSAGE", async () => {
+    const out = await runGmailOperation(
+      client,
+      baseFields({
+        operation: GmailOperation.UNTRASH_MESSAGE,
+        messageId: "m1",
+      }),
+    )
+    expect(client.gmail.api.messages.untrash).toHaveBeenCalledWith({ id: "m1" })
+    expect(out.untrashed).toBe(true)
+  })
+
+  it("LIST_THREADS", async () => {
+    const out = await runGmailOperation(
+      client,
+      baseFields({ operation: GmailOperation.LIST_THREADS }),
+    )
+    expect(client.gmail.api.threads.list).toHaveBeenCalled()
+    expect(out.count).toBe(1)
+  })
+
+  it("GET_LABEL", async () => {
+    const out = await runGmailOperation(
+      client,
+      baseFields({
+        operation: GmailOperation.GET_LABEL,
+        labelId: "L1",
+      }),
+    )
+    expect(client.gmail.api.labels.get).toHaveBeenCalledWith({ id: "L1" })
+    expect(out.labelId).toBe("L1")
+  })
+
+  it("accepts Corsair path keys", async () => {
+    const out = await runGmailOperation(
+      client,
+      baseFields({ operation: "messages.send" }),
+    )
+    expect(out.messageId).toBe("sent1")
+  })
+
+  it("unknown op throws via registry", async () => {
     await expect(
       runGmailOperation(
         client,
         baseFields({ operation: "NOT_A_REAL_OP" }),
       ),
-    ).rejects.toThrow(/Unknown Gmail operation/)
+    ).rejects.toThrow(/unknown operation/i)
   })
 })

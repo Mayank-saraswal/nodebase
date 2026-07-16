@@ -1,21 +1,71 @@
-import { NonRetriableError } from "inngest"
+import { NonRetriableError, RetryAfterError } from "inngest"
 import type { NodeExecutor } from "@/features/executions/types"
 import prisma from "@/lib/db"
 import { resolveTemplate } from "@/features/executions/lib/template-resolver"
 import { googleDriveChannel } from "@/inngest/channels/google-drive"
 import { refreshGoogleDriveAccessToken } from "@/lib/google-drive-auth"
+import {
+  mapCorsairError,
+  resolveTenantId,
+} from "@/lib/corsair"
+import { tryRunIntegration } from "@/features/integrations/runner"
+import { NodeType } from "@/generated/prisma"
 
 const DRIVE_API = "https://www.googleapis.com/drive/v3"
 const UPLOAD_API = "https://www.googleapis.com/upload/drive/v3"
 
-export const googleDriveExecutor: NodeExecutor = async ({ data, nodeId, context, step, publish, userId,
+export const googleDriveExecutor: NodeExecutor = async ({
+  data,
+  nodeId,
+  context,
+  step,
+  publish,
+  userId,
+  tenantId: tenantIdParam,
 }) => {
   await publish(googleDriveChannel().status({ nodeId, status: "loading" }))
-                                                               
-  // Load config
-  const config = data as any;
 
-if (!config?.credentialId) {
+  // unknown: Node.data JSON boundary
+  const config = (data ?? {}) as Record<string, unknown>
+
+  // ── Corsair backbone path (Option C generic runner) ──
+  {
+    const tenantId =
+      tenantIdParam && tenantIdParam.trim() !== ""
+        ? tenantIdParam
+        : resolveTenantId({ userId })
+    try {
+      const corsairResult = await step.run(
+        `drive-${nodeId}-corsair`,
+        async () => {
+          return tryRunIntegration({
+            nodeType: NodeType.GOOGLE_DRIVE,
+            data: config,
+            context,
+            nodeId,
+            userId,
+            tenantId,
+          })
+        },
+      )
+      if (corsairResult) {
+        await publish(googleDriveChannel().status({ nodeId, status: "success" }))
+        return corsairResult.context
+      }
+    } catch (error) {
+      await publish(googleDriveChannel().status({ nodeId, status: "error" }))
+      if (
+        error instanceof NonRetriableError ||
+        error instanceof RetryAfterError
+      ) {
+        throw error
+      }
+      mapCorsairError(error, "Google Drive")
+    }
+  }
+
+  // ── Legacy path (Cryptr credentials + Drive REST) ──
+  if (!config?.credentialId) {
     await publish(googleDriveChannel().status({ nodeId, status: "error" }))
     throw new NonRetriableError("Google Drive node is missing credential")
   }
@@ -121,7 +171,7 @@ if (!config?.credentialId) {
 
       case "LIST_FILES": {
         const q = config.query
-          ? resolveTemplate(config.query, context)
+          ? resolveTemplate(config.query as string, context)
           : config.folderId
             ? `'${config.folderId}' in parents and trashed=false`
             : "trashed=false"
