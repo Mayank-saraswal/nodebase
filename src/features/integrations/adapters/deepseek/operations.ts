@@ -1,10 +1,20 @@
 /**
  * DeepSeek Corsair operations — full @corsair-dev/deepseek surface.
+ * Edge cases: messages/params JSON, roles, sampling ranges, stream=true rejected.
  */
 
 import { NonRetriableError } from "inngest"
 import { deepseekIntegrationDefinition } from "@/features/integrations/registry/integrations/deepseek"
 import { resolveOperation } from "@/features/integrations/registry/resolve"
+import {
+  assertNoStream,
+  assertSamplingParams,
+  buildChatMessages,
+  optNum,
+  parseJsonObject,
+  parseValidatedMessages,
+  requireClientSurface,
+} from "../_shared/llm-edges"
 
 type ApiFn = (args?: Record<string, unknown>) => Promise<unknown>
 
@@ -40,14 +50,12 @@ function asRecord(v: unknown): Record<string, unknown> {
 function wrap(operation: string, data: unknown): Record<string, unknown> {
   const rec = asRecord(data)
   let text = ""
-  // OpenAI-style choices
   const choices = rec.choices
   if (Array.isArray(choices) && choices[0]) {
     const c0 = asRecord(choices[0])
     const msg = asRecord(c0.message)
     if (typeof msg.content === "string") text = msg.content
   }
-  // Anthropic-style content array
   if (!text && Array.isArray(rec.content)) {
     const parts = rec.content as unknown[]
     const texts = parts
@@ -77,66 +85,22 @@ export function isDeepseekCorsairOp(operation: string): boolean {
   }
 }
 
-function parseJsonObject(raw: string, field: string): Record<string, unknown> {
-  if (!raw.trim()) return {}
-  try {
-    const parsed: unknown = JSON.parse(raw)
-    if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
-      return parsed as Record<string, unknown>
-    }
-    throw new NonRetriableError(`DeepSeek ${field} must be a JSON object.`)
-  } catch (e) {
-    if (e instanceof NonRetriableError) throw e
-    throw new NonRetriableError(`DeepSeek ${field} is invalid JSON.`)
-  }
-}
-
-function parseJsonArray(raw: string, field: string): unknown[] | undefined {
-  if (!raw.trim()) return undefined
-  try {
-    const parsed: unknown = JSON.parse(raw)
-    if (!Array.isArray(parsed)) {
-      throw new NonRetriableError(`DeepSeek ${field} must be a JSON array.`)
-    }
-    return parsed
-  } catch (e) {
-    if (e instanceof NonRetriableError) throw e
-    throw new NonRetriableError(`DeepSeek ${field} is invalid JSON.`)
-  }
-}
-
-function optNum(value: string): number | undefined {
-  if (!value.trim()) return undefined
-  const n = Number(value)
-  return Number.isFinite(n) ? n : undefined
-}
-
-function resolveModel(fields: ResolvedDeepseekFields): "deepseek-chat" | "deepseek-reasoner" {
+function resolveModel(
+  fields: ResolvedDeepseekFields,
+): "deepseek-chat" | "deepseek-reasoner" {
   const m = fields.model.trim()
   if (m === "deepseek-reasoner") return "deepseek-reasoner"
   return "deepseek-chat"
 }
 
-function buildChatMessages(fields: ResolvedDeepseekFields): unknown[] {
-  const fromJson = parseJsonArray(fields.messagesJson, "messagesJson")
-  if (fromJson) return fromJson
-  const user =
-    fields.userPrompt.trim() || fields.prompt.trim()
-  if (!user) {
-    throw new NonRetriableError(
-      "DeepSeek CHAT: userPrompt, prompt, or messagesJson is required.",
-    )
-  }
-  const messages: Array<Record<string, string>> = []
-  if (fields.systemPrompt.trim()) {
-    messages.push({ role: "system", content: fields.systemPrompt })
-  }
-  messages.push({ role: "user", content: user })
-  return messages
-}
-
-function buildAnthropicMessages(fields: ResolvedDeepseekFields): unknown[] {
-  const fromJson = parseJsonArray(fields.messagesJson, "messagesJson")
+/** Anthropic path only allows user|assistant in messages (system is separate). */
+function buildAnthropicMessages(
+  fields: ResolvedDeepseekFields,
+): Array<{ role: string; content: string }> {
+  const fromJson = parseValidatedMessages(fields.messagesJson, "DeepSeek", [
+    "user",
+    "assistant",
+  ])
   if (fromJson) return fromJson
   const user = fields.userPrompt.trim() || fields.prompt.trim()
   if (!user) {
@@ -151,10 +115,25 @@ export async function runDeepseekOperation(
   client: DeepseekApiClient,
   fields: ResolvedDeepseekFields,
 ): Promise<Record<string, unknown>> {
+  requireClientSurface(
+    "DeepSeek",
+    Boolean(client.deepseek?.api?.chat?.createCompletion),
+    "client.deepseek.api missing. Is @corsair-dev/deepseek registered?",
+  )
+
   const api = client.deepseek.api
   const op = normalizeOp(fields.operation)
   const model = resolveModel(fields)
-  const extra = parseJsonObject(fields.paramsJson, "paramsJson")
+  const extra = parseJsonObject(fields.paramsJson, "paramsJson", "DeepSeek")
+  assertNoStream("DeepSeek", false, extra)
+
+  const temperature = optNum(fields.temperature)
+  const maxTokens = optNum(fields.maxTokens)
+  assertSamplingParams("DeepSeek", {
+    temperature,
+    maxTokens,
+    topP: typeof extra.topP === "number" ? extra.topP : undefined,
+  })
 
   switch (op) {
     case "CHAT":
@@ -162,13 +141,21 @@ export async function runDeepseekOperation(
     case "CREATE_COMPLETION":
     case "GENERATE_TEXT":
     case "chat.createCompletion": {
-      const messages = buildChatMessages(fields)
+      const messages = buildChatMessages({
+        brand: "DeepSeek CHAT",
+        messagesJson: fields.messagesJson,
+        userPrompt: fields.userPrompt,
+        prompt: fields.prompt,
+        systemPrompt: fields.systemPrompt,
+        // Align with shared chat edges: system | user | assistant
+      })
       const data = await api.chat.createCompletion({
         model,
         messages,
-        temperature: optNum(fields.temperature),
-        maxTokens: optNum(fields.maxTokens),
+        temperature,
+        maxTokens,
         ...extra,
+        stream: undefined,
       })
       return wrap("CHAT", data)
     }
@@ -176,19 +163,20 @@ export async function runDeepseekOperation(
     case "CREATE_MESSAGE":
     case "anthropic.createMessage": {
       const messages = buildAnthropicMessages(fields)
-      const maxTokens = optNum(fields.maxTokens) ?? 1024
-      if (maxTokens <= 0) {
+      const tokens = maxTokens ?? 1024
+      if (tokens <= 0) {
         throw new NonRetriableError(
           "DeepSeek ANTHROPIC_MESSAGE: maxTokens must be a positive number.",
         )
       }
       const data = await api.anthropic.createMessage({
         model,
-        maxTokens,
+        maxTokens: tokens,
         messages,
         system: fields.systemPrompt.trim() || undefined,
-        temperature: optNum(fields.temperature),
+        temperature,
         ...extra,
+        stream: undefined,
       })
       return wrap("ANTHROPIC_MESSAGE", data)
     }

@@ -10,6 +10,14 @@
 import { NonRetriableError } from "inngest"
 import { perplexityIntegrationDefinition } from "@/features/integrations/registry/integrations/perplexity"
 import { resolveOperation } from "@/features/integrations/registry/resolve"
+import {
+  assertNoStream,
+  assertSamplingParams,
+  buildChatMessages,
+  optNum,
+  parseJsonObject,
+  requireClientSurface,
+} from "../_shared/llm-edges"
 
 type ApiFn = (args?: Record<string, unknown>) => Promise<unknown>
 
@@ -87,125 +95,20 @@ export function isPerplexityCorsairOp(operation: string): boolean {
   }
 }
 
-function parseJsonObject(raw: string, field: string): Record<string, unknown> {
-  if (!raw.trim()) return {}
-  try {
-    const parsed: unknown = JSON.parse(raw)
-    if (
-      parsed !== null &&
-      typeof parsed === "object" &&
-      !Array.isArray(parsed)
-    ) {
-      return parsed as Record<string, unknown>
-    }
-    throw new NonRetriableError(`Perplexity ${field} must be a JSON object.`)
-  } catch (e) {
-    if (e instanceof NonRetriableError) throw e
-    throw new NonRetriableError(`Perplexity ${field} is invalid JSON.`)
-  }
-}
-
-function parseJsonArray(raw: string, field: string): unknown[] | undefined {
-  if (!raw.trim()) return undefined
-  try {
-    const parsed: unknown = JSON.parse(raw)
-    if (!Array.isArray(parsed)) {
-      throw new NonRetriableError(`Perplexity ${field} must be a JSON array.`)
-    }
-    return parsed
-  } catch (e) {
-    if (e instanceof NonRetriableError) throw e
-    throw new NonRetriableError(`Perplexity ${field} is invalid JSON.`)
-  }
-}
-
-function optNum(value: string): number | undefined {
-  if (!value.trim()) return undefined
-  const n = Number(value)
-  return Number.isFinite(n) ? n : undefined
-}
-
-/**
- * Build messages for chat.completions.
- * Prefers messagesJson; else system + user convenience fields.
- */
-function buildMessages(
-  fields: ResolvedPerplexityFields,
-): Array<{ role: string; content: string }> {
-  const fromJson = parseJsonArray(fields.messagesJson, "messagesJson")
-  if (fromJson) {
-    // Validate each message shape without any
-    const out: Array<{ role: string; content: string }> = []
-    for (let i = 0; i < fromJson.length; i++) {
-      const item = fromJson[i]
-      if (item === null || typeof item !== "object" || Array.isArray(item)) {
-        throw new NonRetriableError(
-          `Perplexity messagesJson[${i}] must be an object with role and content.`,
-        )
-      }
-      const rec = item as Record<string, unknown>
-      const role = rec.role
-      const content = rec.content
-      if (typeof role !== "string" || !role.trim()) {
-        throw new NonRetriableError(
-          `Perplexity messagesJson[${i}].role must be a non-empty string.`,
-        )
-      }
-      if (typeof content !== "string") {
-        throw new NonRetriableError(
-          `Perplexity messagesJson[${i}].content must be a string.`,
-        )
-      }
-      // Reject unknown roles early (package accepts system|user|assistant)
-      if (role !== "system" && role !== "user" && role !== "assistant") {
-        throw new NonRetriableError(
-          `Perplexity messagesJson[${i}].role must be system, user, or assistant.`,
-        )
-      }
-      out.push({ role, content })
-    }
-    if (out.length === 0) {
-      throw new NonRetriableError(
-        "Perplexity CHAT: messagesJson must contain at least one message.",
-      )
-    }
-    return out
-  }
-
-  const user = fields.userPrompt.trim() || fields.prompt.trim()
-  if (!user) {
-    throw new NonRetriableError(
-      "Perplexity CHAT: userPrompt, prompt, or messagesJson is required.",
-    )
-  }
-  const messages: Array<{ role: string; content: string }> = []
-  if (fields.systemPrompt.trim()) {
-    messages.push({ role: "system", content: fields.systemPrompt })
-  }
-  messages.push({ role: "user", content: user })
-  return messages
-}
-
 export async function runPerplexityOperation(
   client: PerplexityApiClient,
   fields: ResolvedPerplexityFields,
 ): Promise<Record<string, unknown>> {
-  if (!client.perplexityai?.api?.chat?.completions) {
-    throw new NonRetriableError(
-      "Perplexity Corsair: client.perplexityai.api.chat.completions missing. Is @corsair-dev/perplexityai registered?",
-    )
-  }
+  requireClientSurface(
+    "Perplexity",
+    Boolean(client.perplexityai?.api?.chat?.completions),
+    "client.perplexityai.api.chat.completions missing. Is @corsair-dev/perplexityai registered?",
+  )
 
   const api = client.perplexityai.api
   const op = normalizeOp(fields.operation)
-  const extra = parseJsonObject(fields.paramsJson, "paramsJson")
-
-  // Strip stream:true for workflow automation — streaming not supported on this path
-  if (fields.stream || extra.stream === true) {
-    throw new NonRetriableError(
-      "Perplexity CHAT: stream=true is not supported in workflow execution. Use non-streaming completions.",
-    )
-  }
+  const extra = parseJsonObject(fields.paramsJson, "paramsJson", "Perplexity")
+  assertNoStream("Perplexity", fields.stream, extra)
 
   switch (op) {
     case "CHAT":
@@ -218,7 +121,13 @@ export async function runPerplexityOperation(
       if (!model) {
         throw new NonRetriableError("Perplexity CHAT: model is required.")
       }
-      const messages = buildMessages(fields)
+      const messages = buildChatMessages({
+        brand: "Perplexity CHAT",
+        messagesJson: fields.messagesJson,
+        userPrompt: fields.userPrompt,
+        prompt: fields.prompt,
+        systemPrompt: fields.systemPrompt,
+      })
       const max_tokens = optNum(fields.maxTokens)
       const temperature = optNum(fields.temperature)
       const top_p = optNum(fields.topP)
@@ -226,22 +135,11 @@ export async function runPerplexityOperation(
       const presence_penalty = optNum(fields.presencePenalty)
       const frequency_penalty = optNum(fields.frequencyPenalty)
 
-      // Range validation (API common bounds)
-      if (temperature !== undefined && (temperature < 0 || temperature > 2)) {
-        throw new NonRetriableError(
-          "Perplexity CHAT: temperature must be between 0 and 2.",
-        )
-      }
-      if (top_p !== undefined && (top_p <= 0 || top_p > 1)) {
-        throw new NonRetriableError(
-          "Perplexity CHAT: top_p must be in (0, 1].",
-        )
-      }
-      if (max_tokens !== undefined && max_tokens <= 0) {
-        throw new NonRetriableError(
-          "Perplexity CHAT: max_tokens must be a positive number.",
-        )
-      }
+      assertSamplingParams("Perplexity CHAT", {
+        temperature,
+        topP: top_p,
+        maxTokens: max_tokens,
+      })
 
       const data = await api.chat.completions({
         model,
@@ -254,7 +152,6 @@ export async function runPerplexityOperation(
         return_images: fields.returnImages || undefined,
         presence_penalty,
         frequency_penalty,
-        // never pass stream
         ...extra,
         stream: undefined,
       })

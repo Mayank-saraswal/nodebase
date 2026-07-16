@@ -121,6 +121,68 @@ describe("runDeepseekOperation (full Corsair surface + edges)", () => {
     ).rejects.toThrow(/array/)
   })
 
+  it("rejects empty messagesJson array", async () => {
+    await expect(
+      runDeepseekOperation(
+        client,
+        fields({ userPrompt: "", messagesJson: "[]" }),
+      ),
+    ).rejects.toThrow(/at least one message/)
+  })
+
+  it("rejects invalid message role", async () => {
+    await expect(
+      runDeepseekOperation(
+        client,
+        fields({
+          userPrompt: "",
+          messagesJson: JSON.stringify([{ role: "bogus", content: "x" }]),
+        }),
+      ),
+    ).rejects.toThrow(/role/)
+  })
+
+  it("rejects non-string message content", async () => {
+    await expect(
+      runDeepseekOperation(
+        client,
+        fields({
+          userPrompt: "",
+          messagesJson: JSON.stringify([
+            { role: "user", content: { nested: true } },
+          ]),
+        }),
+      ),
+    ).rejects.toThrow(/content must be a string/)
+  })
+
+  it("rejects stream=true", async () => {
+    await expect(
+      runDeepseekOperation(
+        client,
+        fields({ paramsJson: '{"stream":true}' }),
+      ),
+    ).rejects.toThrow(/stream/)
+  })
+
+  it("rejects out-of-range temperature / max_tokens", async () => {
+    await expect(
+      runDeepseekOperation(client, fields({ temperature: "3" })),
+    ).rejects.toThrow(/temperature/)
+    await expect(
+      runDeepseekOperation(client, fields({ maxTokens: "0" })),
+    ).rejects.toThrow(/max_tokens/)
+  })
+
+  it("throws if client surface missing", async () => {
+    const bad = {
+      deepseek: { api: {} },
+    } as unknown as DeepseekApiClient
+    await expect(runDeepseekOperation(bad, fields())).rejects.toThrow(
+      /client\.deepseek\.api missing/,
+    )
+  })
+
   it("ANTHROPIC_MESSAGE requires prompt and maxTokens default", async () => {
     await expect(
       runDeepseekOperation(

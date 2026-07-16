@@ -121,6 +121,77 @@ describe("runGeminiOperation (full Corsair surface + edges)", () => {
     ).rejects.toThrow(/array/)
   })
 
+  it("rejects empty contentsJson array", async () => {
+    await expect(
+      runGeminiOperation(
+        client,
+        fields({ userPrompt: "", contentsJson: "[]" }),
+      ),
+    ).rejects.toThrow(/at least one content/)
+  })
+
+  it("rejects invalid contentsJson role (must be user|model)", async () => {
+    await expect(
+      runGeminiOperation(
+        client,
+        fields({
+          userPrompt: "",
+          contentsJson: JSON.stringify([
+            { role: "system", parts: [{ text: "x" }] },
+          ]),
+        }),
+      ),
+    ).rejects.toThrow(/user or model/)
+  })
+
+  it("rejects non-string parts.text", async () => {
+    await expect(
+      runGeminiOperation(
+        client,
+        fields({
+          userPrompt: "",
+          contentsJson: JSON.stringify([
+            { role: "user", parts: [{ text: 123 }] },
+          ]),
+        }),
+      ),
+    ).rejects.toThrow(/text must be a string/)
+  })
+
+  it("rejects invalid paramsJson", async () => {
+    await expect(
+      runGeminiOperation(
+        client,
+        fields({ operation: "LIST_MODELS", paramsJson: "not-json" }),
+      ),
+    ).rejects.toThrow(/JSON/)
+  })
+
+  it("rejects stream=true", async () => {
+    await expect(
+      runGeminiOperation(
+        client,
+        fields({ paramsJson: '{"stream":true}' }),
+      ),
+    ).rejects.toThrow(/stream/)
+  })
+
+  it("rejects out-of-range temperature / maxOutputTokens", async () => {
+    await expect(
+      runGeminiOperation(client, fields({ temperature: "3" })),
+    ).rejects.toThrow(/temperature/)
+    await expect(
+      runGeminiOperation(client, fields({ maxOutputTokens: "0" })),
+    ).rejects.toThrow(/max_tokens/)
+  })
+
+  it("throws if client surface missing", async () => {
+    const bad = { gemini: { api: {} } } as unknown as GeminiApiClient
+    await expect(runGeminiOperation(bad, fields())).rejects.toThrow(
+      /client\.gemini\.api missing/,
+    )
+  })
+
   it("COUNT_TOKENS + EMBED edges", async () => {
     await runGeminiOperation(
       client,

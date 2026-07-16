@@ -112,6 +112,84 @@ describe("runOpenAIOperation (full Corsair surface + edges)", () => {
     ).rejects.toThrow(/array/)
   })
 
+  it("rejects empty messagesJson array", async () => {
+    await expect(
+      runOpenAIOperation(
+        client,
+        fields({ userPrompt: "", messagesJson: "[]" }),
+      ),
+    ).rejects.toThrow(/at least one message/)
+  })
+
+  it("rejects invalid message role", async () => {
+    await expect(
+      runOpenAIOperation(
+        client,
+        fields({
+          userPrompt: "",
+          messagesJson: JSON.stringify([{ role: "tool", content: "x" }]),
+        }),
+      ),
+    ).rejects.toThrow(/role/)
+  })
+
+  it("rejects non-string message content", async () => {
+    await expect(
+      runOpenAIOperation(
+        client,
+        fields({
+          userPrompt: "",
+          messagesJson: JSON.stringify([
+            { role: "user", content: { nested: true } },
+          ]),
+        }),
+      ),
+    ).rejects.toThrow(/content must be a string/)
+  })
+
+  it("rejects invalid paramsJson", async () => {
+    await expect(
+      runOpenAIOperation(client, fields({ paramsJson: "[]" })),
+    ).rejects.toThrow(/object/)
+    await expect(
+      runOpenAIOperation(client, fields({ paramsJson: "not-json" })),
+    ).rejects.toThrow(/JSON/)
+  })
+
+  it("rejects stream=true", async () => {
+    await expect(
+      runOpenAIOperation(
+        client,
+        fields({ paramsJson: '{"stream":true}' }),
+      ),
+    ).rejects.toThrow(/stream/)
+  })
+
+  it("rejects out-of-range temperature / max_tokens", async () => {
+    await expect(
+      runOpenAIOperation(client, fields({ temperature: "3" })),
+    ).rejects.toThrow(/temperature/)
+    await expect(
+      runOpenAIOperation(client, fields({ maxTokens: "0" })),
+    ).rejects.toThrow(/max_tokens/)
+  })
+
+  it("rejects top_p out of range via paramsJson", async () => {
+    await expect(
+      runOpenAIOperation(
+        client,
+        fields({ paramsJson: '{"top_p":1.5}' }),
+      ),
+    ).rejects.toThrow(/top_p/)
+  })
+
+  it("throws if client surface missing", async () => {
+    const bad = { openai: {} } as unknown as OpenAIApiClient
+    await expect(runOpenAIOperation(bad, fields())).rejects.toThrow(
+      /client\.openai\.api missing/,
+    )
+  })
+
   it("EMBED requires input", async () => {
     await expect(
       runOpenAIOperation(

@@ -3,11 +3,20 @@
  *
  * Generic path invoker: registry key `group.leaf` → client.openai.api.group.leaf(args)
  * Convenience fields map to common chat / embeddings / images / moderation ops.
+ * Edge cases: messages/params JSON, roles, sampling ranges, stream=true rejected.
  */
 
 import { NonRetriableError } from "inngest"
 import { openaiIntegrationDefinition } from "@/features/integrations/registry/integrations/openai"
 import { resolveOperation } from "@/features/integrations/registry/resolve"
+import {
+  assertNoStream,
+  assertSamplingParams,
+  buildChatMessages,
+  optNum,
+  parseJsonObject,
+  requireClientSurface,
+} from "../_shared/llm-edges"
 
 type ApiFn = (args?: Record<string, unknown>) => Promise<unknown>
 
@@ -78,40 +87,6 @@ export function isOpenAICorsairOp(operation: string): boolean {
   }
 }
 
-function parseJsonObject(raw: string, field: string): Record<string, unknown> {
-  if (!raw.trim()) return {}
-  try {
-    const parsed: unknown = JSON.parse(raw)
-    if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
-      return parsed as Record<string, unknown>
-    }
-    throw new NonRetriableError(`OpenAI ${field} must be a JSON object.`)
-  } catch (e) {
-    if (e instanceof NonRetriableError) throw e
-    throw new NonRetriableError(`OpenAI ${field} is invalid JSON.`)
-  }
-}
-
-function parseJsonArray(raw: string, field: string): unknown[] | undefined {
-  if (!raw.trim()) return undefined
-  try {
-    const parsed: unknown = JSON.parse(raw)
-    if (!Array.isArray(parsed)) {
-      throw new NonRetriableError(`OpenAI ${field} must be a JSON array.`)
-    }
-    return parsed
-  } catch (e) {
-    if (e instanceof NonRetriableError) throw e
-    throw new NonRetriableError(`OpenAI ${field} is invalid JSON.`)
-  }
-}
-
-function optNum(value: string): number | undefined {
-  if (!value.trim()) return undefined
-  const n = Number(value)
-  return Number.isFinite(n) ? n : undefined
-}
-
 function resolveApiFn(
   api: Record<string, unknown>,
   key: string,
@@ -141,42 +116,34 @@ function buildArgs(
   key: string,
   fields: ResolvedOpenAIFields,
 ): Record<string, unknown> {
-  const extra = parseJsonObject(fields.paramsJson, "paramsJson")
+  const extra = parseJsonObject(fields.paramsJson, "paramsJson", "OpenAI")
+  assertNoStream("OpenAI", false, extra)
   const model = fields.model.trim() || "gpt-4o-mini"
-  const messagesFromJson = parseJsonArray(fields.messagesJson, "messagesJson")
+  const temperature = optNum(fields.temperature)
+  const maxTokens = optNum(fields.maxTokens)
+  assertSamplingParams("OpenAI", {
+    temperature,
+    maxTokens,
+    topP: typeof extra.top_p === "number" ? extra.top_p : undefined,
+  })
 
   // chat completions
   if (key === "chat.createCompletion") {
-    const messages =
-      messagesFromJson ??
-      ([
-        ...(fields.systemPrompt.trim()
-          ? [{ role: "system", content: fields.systemPrompt }]
-          : []),
-        {
-          role: "user",
-          content:
-            fields.userPrompt.trim() ||
-            fields.prompt.trim() ||
-            fields.input.trim(),
-        },
-      ] as unknown[])
-    if (
-      !messagesFromJson &&
-      !fields.userPrompt.trim() &&
-      !fields.prompt.trim() &&
-      !fields.input.trim()
-    ) {
-      throw new NonRetriableError(
-        "OpenAI CHAT: userPrompt, prompt, or messagesJson is required.",
-      )
-    }
+    const messages = buildChatMessages({
+      brand: "OpenAI CHAT",
+      messagesJson: fields.messagesJson,
+      userPrompt: fields.userPrompt,
+      prompt: fields.prompt,
+      systemPrompt: fields.systemPrompt,
+      input: fields.input,
+    })
     return {
       model,
       messages,
-      temperature: optNum(fields.temperature),
-      max_tokens: optNum(fields.maxTokens),
+      temperature,
+      max_tokens: maxTokens,
       ...extra,
+      stream: undefined,
     }
   }
 
@@ -191,10 +158,11 @@ function buildArgs(
     return {
       model: fields.model.trim() || "gpt-3.5-turbo-instruct",
       prompt,
-      temperature: optNum(fields.temperature),
-      max_tokens: optNum(fields.maxTokens),
+      temperature,
+      max_tokens: maxTokens,
       n: optNum(fields.n),
       ...extra,
+      stream: undefined,
     }
   }
 
@@ -336,7 +304,16 @@ function buildArgs(
   if (fields.assistantId.trim()) base.assistant_id = fields.assistantId
   if (fields.runId.trim()) base.run_id = fields.runId
   if (fields.vectorStoreId.trim()) base.vector_store_id = fields.vectorStoreId
-  if (messagesFromJson) base.messages = messagesFromJson
+  if (fields.messagesJson.trim()) {
+    base.messages = buildChatMessages({
+      brand: "OpenAI",
+      messagesJson: fields.messagesJson,
+      userPrompt: fields.userPrompt,
+      prompt: fields.prompt,
+      systemPrompt: fields.systemPrompt,
+      input: fields.input,
+    })
+  }
 
   // create endpoints with empty args must still be callable (e.g. models.list)
   return base
@@ -352,11 +329,11 @@ export async function runOpenAIOperation(
   client: OpenAIApiClient,
   fields: ResolvedOpenAIFields,
 ): Promise<Record<string, unknown>> {
-  if (!client.openai?.api) {
-    throw new NonRetriableError(
-      "OpenAI Corsair: client.openai.api missing. Is @corsair-dev/openai registered?",
-    )
-  }
+  requireClientSurface(
+    "OpenAI",
+    Boolean(client.openai?.api),
+    "client.openai.api missing. Is @corsair-dev/openai registered?",
+  )
 
   const key = normalizeToKey(fields.operation)
   const fn = resolveApiFn(
@@ -368,7 +345,7 @@ export async function runOpenAIOperation(
   // strip undefined so zod optional fields stay clean
   const cleaned: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(args)) {
-    if (v !== undefined) cleaned[k] = v
+    if (v !== undefined && k !== "stream") cleaned[k] = v
   }
 
   const data = await fn(

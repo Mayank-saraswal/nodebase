@@ -1,10 +1,19 @@
 /**
  * Gemini Corsair operations — full @corsair-dev/gemini surface.
+ * Edge cases: contents/params JSON, roles, sampling ranges, stream=true rejected.
  */
 
 import { NonRetriableError } from "inngest"
 import { geminiIntegrationDefinition } from "@/features/integrations/registry/integrations/gemini"
 import { resolveOperation } from "@/features/integrations/registry/resolve"
+import {
+  assertNoStream,
+  assertSamplingParams,
+  optNum,
+  parseGeminiContents,
+  parseJsonObject,
+  requireClientSurface,
+} from "../_shared/llm-edges"
 
 type ApiFn = (args?: Record<string, unknown>) => Promise<unknown>
 
@@ -88,50 +97,12 @@ export function isGeminiCorsairOp(operation: string): boolean {
   }
 }
 
-function parseJsonObject(raw: string, field: string): Record<string, unknown> {
-  if (!raw.trim()) return {}
-  try {
-    const parsed: unknown = JSON.parse(raw)
-    if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
-      return parsed as Record<string, unknown>
-    }
-    throw new NonRetriableError(`Gemini ${field} must be a JSON object.`)
-  } catch (e) {
-    if (e instanceof NonRetriableError) throw e
-    throw new NonRetriableError(`Gemini ${field} is invalid JSON.`)
-  }
-}
-
-function parseJsonArray(raw: string, field: string): unknown[] | undefined {
-  if (!raw.trim()) return undefined
-  try {
-    const parsed: unknown = JSON.parse(raw)
-    if (!Array.isArray(parsed)) {
-      throw new NonRetriableError(`Gemini ${field} must be a JSON array.`)
-    }
-    return parsed
-  } catch (e) {
-    if (e instanceof NonRetriableError) throw e
-    throw new NonRetriableError(`Gemini ${field} is invalid JSON.`)
-  }
-}
-
-function optNum(value: string): number | undefined {
-  if (!value.trim()) return undefined
-  const n = Number(value)
-  return Number.isFinite(n) ? n : undefined
-}
-
 function userText(fields: ResolvedGeminiFields): string {
-  return (
-    fields.userPrompt.trim() ||
-    fields.prompt.trim() ||
-    ""
-  )
+  return fields.userPrompt.trim() || fields.prompt.trim() || ""
 }
 
 function buildContents(fields: ResolvedGeminiFields): unknown[] {
-  const fromJson = parseJsonArray(fields.contentsJson, "contentsJson")
+  const fromJson = parseGeminiContents(fields.contentsJson, "Gemini")
   if (fromJson) return fromJson
   const text = userText(fields)
   if (!text) {
@@ -145,7 +116,13 @@ function buildContents(fields: ResolvedGeminiFields): unknown[] {
 function generationConfig(fields: ResolvedGeminiFields) {
   const temperature = optNum(fields.temperature)
   const maxOutputTokens = optNum(fields.maxOutputTokens)
-  if (temperature === undefined && maxOutputTokens === undefined) return undefined
+  assertSamplingParams("Gemini", {
+    temperature,
+    maxTokens: maxOutputTokens,
+  })
+  if (temperature === undefined && maxOutputTokens === undefined) {
+    return undefined
+  }
   return {
     ...(temperature !== undefined ? { temperature } : {}),
     ...(maxOutputTokens !== undefined ? { maxOutputTokens } : {}),
@@ -163,10 +140,17 @@ export async function runGeminiOperation(
   client: GeminiApiClient,
   fields: ResolvedGeminiFields,
 ): Promise<Record<string, unknown>> {
+  requireClientSurface(
+    "Gemini",
+    Boolean(client.gemini?.api?.content?.generateContent),
+    "client.gemini.api missing. Is @corsair-dev/gemini registered?",
+  )
+
   const api = client.gemini.api
   const op = normalizeOp(fields.operation)
   const model = fields.model.trim() || "gemini-2.0-flash"
-  const extra = parseJsonObject(fields.paramsJson, "paramsJson")
+  const extra = parseJsonObject(fields.paramsJson, "paramsJson", "Gemini")
+  assertNoStream("Gemini", false, extra)
 
   switch (op) {
     case "CHAT":
@@ -180,6 +164,7 @@ export async function runGeminiOperation(
         generationConfig: generationConfig(fields),
         systemInstruction: systemInstruction(fields),
         ...extra,
+        stream: undefined,
       })
       return wrap("CHAT", data)
     }
@@ -234,7 +219,9 @@ export async function runGeminiOperation(
     case "videos.generateVideos": {
       const prompt = fields.prompt.trim() || fields.userPrompt.trim()
       if (!prompt) {
-        throw new NonRetriableError("Gemini GENERATE_VIDEO: prompt is required.")
+        throw new NonRetriableError(
+          "Gemini GENERATE_VIDEO: prompt is required.",
+        )
       }
       const data = await api.videos.generateVideos({
         model: fields.model.trim() || "veo-2.0-generate-001",
