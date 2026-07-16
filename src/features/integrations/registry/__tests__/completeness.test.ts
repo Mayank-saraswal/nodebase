@@ -16,6 +16,7 @@ import {
   telegramIntegrationDefinition,
   discordIntegrationDefinition,
   twitterIntegrationDefinition,
+  razorpayIntegrationDefinition,
   buildAliasMap,
   listOperationKeys,
 } from "../index"
@@ -386,5 +387,43 @@ describe("Option C registry completeness", () => {
     const map = buildAliasMap(twitterIntegrationDefinition)
     expect(map.get("POST_TWEET")).toBe("tweets.create")
     expect(map.get("REPLY_TWEET")).toBe("tweets.createReply")
+  })
+
+  it("Razorpay registry covers all Corsair endpoints", () => {
+    const keys = listOperationKeys(razorpayIntegrationDefinition)
+    const required = [
+      "orders.create",
+      "orders.get",
+      "orders.list",
+      "payments.get",
+      "payments.list",
+      "payments.capture",
+      "payouts.get",
+      "payouts.list",
+      "payouts.create",
+      "refunds.create",
+      "refunds.get",
+      "refunds.list",
+      "customers.create",
+      "customers.get",
+      "customers.list",
+      "customers.update",
+      "settlements.list",
+      "settlements.get",
+      "subscriptions.list",
+      "subscriptions.get",
+      "subscriptions.create",
+      "subscriptions.update",
+      "subscriptions.cancel",
+      "subscriptions.pause",
+      "subscriptions.resume",
+    ]
+    expect(corsairKeysCovered(keys, required)).toEqual([])
+  })
+
+  it("Razorpay aliases resolve ORDER_CREATE", () => {
+    const map = buildAliasMap(razorpayIntegrationDefinition)
+    expect(map.get("ORDER_CREATE")).toBe("orders.create")
+    expect(map.get("SUBSCRIPTION_PAUSE")).toBe("subscriptions.pause")
   })
 })

@@ -10,6 +10,7 @@ import { hubspotIntegrationDefinition } from "./integrations/hubspot"
 import { telegramIntegrationDefinition } from "./integrations/telegram"
 import { discordIntegrationDefinition } from "./integrations/discord"
 import { twitterIntegrationDefinition } from "./integrations/twitter"
+import { razorpayIntegrationDefinition } from "./integrations/razorpay"
 import { resolveOperation, buildAliasMap, listOperationKeys } from "./resolve"
 import type { IntegrationDefinition } from "./types"
 
@@ -35,6 +36,7 @@ const BY_TYPE_KEY: Record<string, IntegrationDefinition> = {
   telegram: telegramIntegrationDefinition,
   discord: discordIntegrationDefinition,
   twitter: twitterIntegrationDefinition,
+  razorpay: razorpayIntegrationDefinition,
 }
 
 /** Map Prisma NodeType → registry typeKey */
@@ -134,4 +136,5 @@ export {
   telegramIntegrationDefinition,
   discordIntegrationDefinition,
   twitterIntegrationDefinition,
+  razorpayIntegrationDefinition,
 }

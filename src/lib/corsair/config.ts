@@ -65,7 +65,8 @@ export function isCorsairPluginEnabled(plugin: CorsairPluginId): boolean {
     plugin === "hubspot" ||
     plugin === "telegram" ||
     plugin === "discord" ||
-    plugin === "twitter"
+    plugin === "twitter" ||
+    plugin === "razorpay"
   return envFlag(PLUGIN_ENV[plugin], defaultOn)
 }
 

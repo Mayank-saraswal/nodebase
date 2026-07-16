@@ -35,6 +35,7 @@
     "@corsair-dev/googlesheets": "^0.1.6",
     "@corsair-dev/hubspot": "^0.1.6",
     "@corsair-dev/notion": "^0.1.4",
+    "@corsair-dev/razorpay": "^0.1.4",
     "@corsair-dev/slack": "^0.1.4",
     "@corsair-dev/telegram": "^0.1.4",
     "@corsair-dev/twitter": "^0.1.3",

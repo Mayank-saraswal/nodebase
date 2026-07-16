@@ -10,6 +10,7 @@ import { hubspot } from "@corsair-dev/hubspot"
 import { telegram } from "@corsair-dev/telegram"
 import { discord } from "@corsair-dev/discord"
 import { twitter } from "@corsair-dev/twitter"
+import { razorpay } from "@corsair-dev/razorpay"
 import { getCorsairPool } from "./pool"
 import {
   getAppUrl,
@@ -74,6 +75,9 @@ function buildCorsair() {
         permissions: { mode: "open" },
       }),
       twitter({
+        permissions: { mode: "open" },
+      }),
+      razorpay({
         permissions: { mode: "open" },
       }),
     ],
