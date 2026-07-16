@@ -15,6 +15,7 @@ import { stripeIntegrationDefinition } from "./integrations/stripe"
 import { openaiIntegrationDefinition } from "./integrations/openai"
 import { geminiIntegrationDefinition } from "./integrations/gemini"
 import { deepseekIntegrationDefinition } from "./integrations/deepseek"
+import { perplexityIntegrationDefinition } from "./integrations/perplexity"
 import { resolveOperation, buildAliasMap, listOperationKeys } from "./resolve"
 import type { IntegrationDefinition } from "./types"
 
@@ -45,6 +46,7 @@ const BY_TYPE_KEY: Record<string, IntegrationDefinition> = {
   openai: openaiIntegrationDefinition,
   gemini: geminiIntegrationDefinition,
   deepseek: deepseekIntegrationDefinition,
+  perplexity: perplexityIntegrationDefinition,
 }
 
 /** Map Prisma NodeType → registry typeKey */
@@ -149,4 +151,5 @@ export {
   openaiIntegrationDefinition,
   geminiIntegrationDefinition,
   deepseekIntegrationDefinition,
+  perplexityIntegrationDefinition,
 }

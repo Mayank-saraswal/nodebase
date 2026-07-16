@@ -46,6 +46,7 @@ import { stripeAdapter } from "@/features/integrations/adapters/stripe/adapter"
 import { openaiAdapter } from "@/features/integrations/adapters/openai/adapter"
 import { geminiAdapter } from "@/features/integrations/adapters/gemini/adapter"
 import { deepseekAdapter } from "@/features/integrations/adapters/deepseek/adapter"
+import { perplexityAdapter } from "@/features/integrations/adapters/perplexity/adapter"
 
 /** Adapter map keyed by Corsair plugin id */
 const ADAPTERS: Partial<Record<CorsairPluginId, IntegrationAdapter>> = {
@@ -64,6 +65,7 @@ const ADAPTERS: Partial<Record<CorsairPluginId, IntegrationAdapter>> = {
   openai: openaiAdapter,
   gemini: geminiAdapter,
   deepseek: deepseekAdapter,
+  perplexityai: perplexityAdapter,
 }
 
 export type RunIntegrationParams = {

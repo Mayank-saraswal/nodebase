@@ -15,6 +15,7 @@ import { stripe } from "@corsair-dev/stripe"
 import { openai } from "@corsair-dev/openai"
 import { gemini } from "@corsair-dev/gemini"
 import { deepseek } from "@corsair-dev/deepseek"
+import { perplexityai } from "@corsair-dev/perplexityai"
 import { getCorsairPool } from "./pool"
 import {
   getAppUrl,
@@ -94,6 +95,9 @@ function buildCorsair() {
         permissions: { mode: "open" },
       }),
       deepseek({
+        permissions: { mode: "open" },
+      }),
+      perplexityai({
         permissions: { mode: "open" },
       }),
     ],

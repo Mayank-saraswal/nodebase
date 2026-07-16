@@ -70,7 +70,8 @@ export function isCorsairPluginEnabled(plugin: CorsairPluginId): boolean {
     plugin === "stripe" ||
     plugin === "openai" ||
     plugin === "gemini" ||
-    plugin === "deepseek"
+    plugin === "deepseek" ||
+    plugin === "perplexityai"
   return envFlag(PLUGIN_ENV[plugin], defaultOn)
 }
 

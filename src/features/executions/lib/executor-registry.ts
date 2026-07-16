@@ -12,6 +12,7 @@ import { aiExecutor } from "../components/ai/executor";
 import { openAiExecutor } from "../components/openai/executor";
 import { geminiExecutor } from "../components/gemini/executor";
 import { deepseekExecutor } from "../components/deepseek/executor";
+import { perplexityExecutor } from "../components/perplexity/executor";
 import { telegramExecutor } from "../components/telegram/executor";
 import { xExecutor } from "../components/x/executor";
 import { workdayExecutor } from "../components/workday/executor";
@@ -60,7 +61,7 @@ export const executorRegistry = {
     [NodeType.XAI]: aiExecutor,
     [NodeType.DISCORD]: discordExecutor,
     [NodeType.SLACK]: slackExecutor,
-    [NodeType.PERPLEXITY]: aiExecutor,
+    [NodeType.PERPLEXITY]: perplexityExecutor,
     [NodeType.DEEPSEEK]: deepseekExecutor,
     [NodeType.GROQ]: aiExecutor,
     [NodeType.TELEGRAM]: telegramExecutor,

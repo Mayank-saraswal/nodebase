@@ -21,6 +21,7 @@ import {
   openaiIntegrationDefinition,
   geminiIntegrationDefinition,
   deepseekIntegrationDefinition,
+  perplexityIntegrationDefinition,
   buildAliasMap,
   listOperationKeys,
 } from "../index"
@@ -28,6 +29,7 @@ import { STRIPE_CORSAIR_ENDPOINTS } from "../integrations/stripe"
 import { OPENAI_CORSAIR_ENDPOINTS } from "../integrations/openai"
 import { GEMINI_CORSAIR_ENDPOINTS } from "../integrations/gemini"
 import { DEEPSEEK_CORSAIR_ENDPOINTS } from "../integrations/deepseek"
+import { PERPLEXITY_CORSAIR_ENDPOINTS } from "../integrations/perplexity"
 
 /** Public Corsair Gmail endpoint paths (from @corsair-dev/gmail dist endpoints) */
 const GMAIL_CORSAIR_ENDPOINTS = [
@@ -487,5 +489,25 @@ describe("Option C registry completeness", () => {
     expect(map.get("CHAT")).toBe("chat.createCompletion")
     expect(map.get("GET_BALANCE")).toBe("user.getBalance")
     expect(map.get("ANTHROPIC_MESSAGE")).toBe("anthropic.createMessage")
+  })
+
+  it("Perplexity registry covers all Corsair endpoints", () => {
+    const keys = listOperationKeys(perplexityIntegrationDefinition)
+    expect(corsairKeysCovered(keys, PERPLEXITY_CORSAIR_ENDPOINTS)).toEqual([])
+    expect(keys.length).toBe(PERPLEXITY_CORSAIR_ENDPOINTS.length)
+    expect(PERPLEXITY_CORSAIR_ENDPOINTS).toEqual(["chat.completions"])
+  })
+
+  it("Perplexity aliases resolve CHAT", () => {
+    const map = buildAliasMap(perplexityIntegrationDefinition)
+    expect(map.get("CHAT")).toBe("chat.completions")
+    expect(map.get("SEARCH_CHAT")).toBe("chat.completions")
+  })
+
+  it("Perplexity maps to corsairPluginId perplexityai", () => {
+    expect(perplexityIntegrationDefinition.corsairPluginId).toBe(
+      "perplexityai",
+    )
+    expect(perplexityIntegrationDefinition.typeKey).toBe("perplexity")
   })
 })

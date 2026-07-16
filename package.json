@@ -38,6 +38,7 @@
     "@corsair-dev/hubspot": "^0.1.6",
     "@corsair-dev/notion": "^0.1.4",
     "@corsair-dev/openai": "^0.1.0",
+    "@corsair-dev/perplexityai": "^0.1.0",
     "@corsair-dev/razorpay": "^0.1.4",
     "@corsair-dev/slack": "^0.1.4",
     "@corsair-dev/stripe": "^0.1.4",
