@@ -4,6 +4,7 @@ import { gmailIntegrationDefinition } from "./integrations/gmail"
 import { googleSheetsIntegrationDefinition } from "./integrations/google-sheets"
 import { googleDriveIntegrationDefinition } from "./integrations/google-drive"
 import { slackIntegrationDefinition } from "./integrations/slack"
+import { githubIntegrationDefinition } from "./integrations/github"
 import { resolveOperation, buildAliasMap, listOperationKeys } from "./resolve"
 import type { IntegrationDefinition } from "./types"
 
@@ -23,6 +24,7 @@ const BY_TYPE_KEY: Record<string, IntegrationDefinition> = {
   google_sheets: googleSheetsIntegrationDefinition,
   google_drive: googleDriveIntegrationDefinition,
   slack: slackIntegrationDefinition,
+  github: githubIntegrationDefinition,
 }
 
 /** Map Prisma NodeType → registry typeKey */
@@ -116,4 +118,5 @@ export {
   googleSheetsIntegrationDefinition,
   googleDriveIntegrationDefinition,
   slackIntegrationDefinition,
+  githubIntegrationDefinition,
 }

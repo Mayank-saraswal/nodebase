@@ -59,7 +59,8 @@ export function isCorsairPluginEnabled(plugin: CorsairPluginId): boolean {
     plugin === "gmail" ||
     plugin === "googlesheets" ||
     plugin === "googledrive" ||
-    plugin === "slack"
+    plugin === "slack" ||
+    plugin === "github"
   return envFlag(PLUGIN_ENV[plugin], defaultOn)
 }
 

@@ -58,6 +58,8 @@ export interface GmailFormValues {
   attachmentOutputFormat?: string
   removeLabelIds?: string
   labelName?: string
+  /** Single label id for GET/UPDATE/DELETE_LABEL */
+  labelId?: string
   draftId?: string
   messageIds?: string
 }
@@ -78,18 +80,32 @@ const OUTPUT_HINTS: Record<string, string[]> = {
   REPLY: ["messageId", "threadId", "to", "subject", "repliedTo", "sentAt"],
   FORWARD: ["messageId", "threadId", "to", "subject", "forwardedFrom", "sentAt"],
   CREATE_DRAFT: ["draftId", "messageId", "threadId", "to", "subject", "createdAt"],
+  GET_DRAFT: ["draftId", "messageId", "threadId", "message"],
+  UPDATE_DRAFT: ["draftId", "messageId", "updated"],
+  DELETE_DRAFT: ["draftId", "deleted"],
   GET_MESSAGE: ["messageId", "threadId", "from", "to", "subject", "date", "snippet", "bodyText", "isUnread", "isStarred", "attachmentCount", "labelIds"],
   LIST_MESSAGES: ["messages", "count", "nextPageToken", "messages.0.messageId", "messages.0.from", "messages.0.subject", "messages.0.isUnread"],
   SEARCH_MESSAGES: ["messages", "count", "nextPageToken", "query", "messages.0.messageId", "messages.0.from", "messages.0.subject"],
+  DELETE_MESSAGE: ["messageId", "deleted", "permanent"],
+  BATCH_MODIFY: ["messageIds", "count", "batchModified"],
   ADD_LABEL: ["messageId", "threadId", "labelIds", "addedLabels"],
   REMOVE_LABEL: ["messageId", "threadId", "labelIds", "removedLabels"],
   MARK_READ: ["messageId", "threadId", "labelIds", "markedRead"],
   MARK_UNREAD: ["messageId", "threadId", "labelIds", "markedUnread"],
   MOVE_TO_TRASH: ["messageId", "threadId", "labelIds", "trashed"],
+  UNTRASH_MESSAGE: ["messageId", "threadId", "untrashed"],
   GET_ATTACHMENT: ["data", "size", "sizeKb", "attachmentId", "messageId"],
+  LIST_THREADS: ["threads", "count", "nextPageToken"],
   GET_THREAD: ["threadId", "messageCount", "messages", "conversationText", "firstMessage.from", "lastMessage.subject"],
+  MODIFY_THREAD: ["threadId", "labelIds", "modified"],
+  DELETE_THREAD: ["threadId", "deleted", "permanent"],
+  TRASH_THREAD: ["threadId", "trashed"],
+  UNTRASH_THREAD: ["threadId", "untrashed"],
   LIST_LABELS: ["labels", "count", "userLabels", "systemLabels"],
+  GET_LABEL: ["labelId", "name", "type", "messagesTotal", "messagesUnread"],
   CREATE_LABEL: ["labelId", "name", "type"],
+  UPDATE_LABEL: ["labelId", "name", "updated"],
+  DELETE_LABEL: ["labelId", "deleted"],
   LIST_DRAFTS: ["drafts", "count", "nextPageToken", "drafts.0.draftId"],
   SEND_DRAFT: ["messageId", "threadId", "draftId", "sentAt"],
 }
@@ -131,47 +147,19 @@ export const GmailDialog = ({
   const [attachmentOutputFormat, setAttachmentOutputFormat] = useState(defaultValues.attachmentOutputFormat || "base64")
   const [labelName, setLabelName] = useState(defaultValues.labelName || "")
   const [draftId, setDraftId] = useState(defaultValues.draftId || "")
+  const [messageIds, setMessageIds] = useState(defaultValues.messageIds || "")
+  const [labelId, setLabelId] = useState(defaultValues.labelId || "")
   const [saved, setSaved] = useState(false)
 
-  const { data: credentials, isLoading: isLoadingCredentials } = useCredentialsByType(CredentialType.GMAIL_OAUTH)
+  const { data: credentials, isLoading: isLoadingCredentials } =
+    useCredentialsByType(CredentialType.GMAIL_OAUTH)
 
-  const config = undefined as any;
-  const isLoading = false;
-
-  // Pre-fill from DB config when loaded
-  useEffect(() => {
-    if (config) {
-      setCredentialId((config as any).credentialId || "")
-      setOperation((config as any).operation as GmailOp)
-      setVariableName((config as any).variableName || "gmail")
-      setTo((config as any).to)
-      setCc((config as any).cc)
-      setBcc((config as any).bcc)
-      setSubject((config as any).subject)
-      setBody((config as any).body)
-      setIsHtml((config as any).isHtml)
-      setReplyTo((config as any).replyTo)
-      setMessageId((config as any).messageId)
-      setThreadId((config as any).threadId)
-      setSearchQuery((config as any).searchQuery)
-      setMaxResults((config as any).maxResults)
-      setLabelIds((config as any).labelIds)
-      setIncludeBody((config as any).includeBody)
-      setIncludeHeaders((config as any).includeHeaders)
-      setAttachmentData((config as any).attachmentData)
-      setAttachmentName((config as any).attachmentName)
-      setAttachmentMime((config as any).attachmentMime)
-      setPageToken((config as any).pageToken)
-      setAttachmentId((config as any).attachmentId)
-      setAttachmentOutputFormat((config as any).attachmentOutputFormat)
-      setLabelName((config as any).labelName)
-      setDraftId((config as any).draftId)
-    }
-  }, [config])
+  // Config is applied via defaultValues from the canvas; no separate DB fetch here
+  const isLoading = false
 
   // Reset when dialog opens with defaultValues
   useEffect(() => {
-    if (open && !config) {
+    if (open) {
       setCredentialId(defaultValues.credentialId || "")
       setOperation((defaultValues.operation as GmailOp) || "SEND")
       setVariableName(defaultValues.variableName || "gmail")
@@ -197,11 +185,24 @@ export const GmailDialog = ({
       setAttachmentOutputFormat(defaultValues.attachmentOutputFormat || "base64")
       setLabelName(defaultValues.labelName || "")
       setDraftId(defaultValues.draftId || "")
+      setMessageIds(defaultValues.messageIds || "")
+      setLabelId(defaultValues.labelId || "")
     }
-  }, [open, defaultValues, config])
+  }, [open, defaultValues])
 
-  const upsertMutation = { isPending: false, mutate: (args: any) => {}, mutateAsync: async (args: any) => {} } as any;
-const testMutation = { isPending: false, mutate: (args: any) => {} } as any;
+  // Canvas save path; optional TRPC persistence is owned by the parent workflow editor
+  const upsertMutation = {
+    isPending: false,
+    mutate: (_args?: Record<string, unknown>) => {
+      /* no-op — parent onSubmit persists node data */
+    },
+  }
+  const testMutation = {
+    isPending: false,
+    mutate: (_args?: { credentialId: string }) => {
+      toast.message("Use the credentials page to verify Gmail OAuth.")
+    },
+  }
 
   const isValid = !!credentialId.trim()
 
@@ -209,14 +210,33 @@ const testMutation = { isPending: false, mutate: (args: any) => {} } as any;
     if (!isValid) return
 
     const values: GmailFormValues = {
-      credentialId, operation, variableName,
-      to, cc, bcc, subject, body, isHtml,
-      replyTo, messageId, threadId,
-      searchQuery, maxResults, labelIds,
-      includeBody, includeHeaders, pageToken,
-      attachmentData, attachmentName, attachmentMime,
-      attachmentId, attachmentOutputFormat,
-      labelName, draftId,
+      credentialId,
+      operation,
+      variableName,
+      to,
+      cc,
+      bcc,
+      subject,
+      body,
+      isHtml,
+      replyTo,
+      messageId,
+      threadId,
+      searchQuery,
+      maxResults,
+      labelIds,
+      includeBody,
+      includeHeaders,
+      pageToken,
+      attachmentData,
+      attachmentName,
+      attachmentMime,
+      attachmentId,
+      attachmentOutputFormat,
+      labelName,
+      labelId,
+      draftId,
+      messageIds,
     }
 
     onSubmit(values)
@@ -225,16 +245,7 @@ const testMutation = { isPending: false, mutate: (args: any) => {} } as any;
       upsertMutation.mutate({
         workflowId,
         nodeId,
-        credentialId,
-        operation,
-        variableName,
-        to, cc, bcc, subject, body, isHtml,
-        replyTo, messageId, threadId,
-        searchQuery, maxResults, labelIds,
-        includeBody, includeHeaders, pageToken,
-        attachmentData, attachmentName, attachmentMime,
-        attachmentId, attachmentOutputFormat,
-        labelName, draftId,
+        ...values,
       })
     }
   }
@@ -279,21 +290,24 @@ const testMutation = { isPending: false, mutate: (args: any) => {} } as any;
                 <Select
                   value={credentialId}
                   onValueChange={setCredentialId}
-                  disabled={isLoadingCredentials || !(credentials as any)?.length}
+                  disabled={isLoadingCredentials || !credentials?.length}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select credential..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {(credentials as any)?.map((credential: any) => {
-                      const badgeClass = credential.type === "GMAIL_OAUTH"
+                    {credentials?.map((credential) => {
+                      const isOauth = credential.type === "GMAIL_OAUTH"
+                      const badgeClass = isOauth
                         ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
                         : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300"
                       return (
                         <SelectItem key={credential.id} value={credential.id}>
                           <span className="flex items-center gap-2">
-                            <span className={`inline-block px-1.5 py-0.5 text-[10px] font-medium rounded ${badgeClass}`}>
-                              {credential.type === "GMAIL_OAUTH" ? "OAuth2" : "Legacy"}
+                            <span
+                              className={`inline-block px-1.5 py-0.5 text-[10px] font-medium rounded ${badgeClass}`}
+                            >
+                              {isOauth ? "OAuth2" : "Legacy"}
                             </span>
                             {credential.name}
                           </span>
@@ -310,11 +324,15 @@ const testMutation = { isPending: false, mutate: (args: any) => {} } as any;
                     onClick={() => testMutation.mutate({ credentialId })}
                     disabled={testMutation.isPending}
                   >
-                    {testMutation.isPending ? <Loader2Icon className="size-3 animate-spin" /> : "Test"}
+                    {testMutation.isPending ? (
+                      <Loader2Icon className="size-3 animate-spin" />
+                    ) : (
+                      "Test"
+                    )}
                   </Button>
                 )}
               </div>
-              {!(credentials as any)?.length && !isLoadingCredentials && (
+              {!credentials?.length && !isLoadingCredentials && (
                 <p className="text-xs text-muted-foreground">
                   No Gmail credentials found.
                 </p>
@@ -351,6 +369,9 @@ const testMutation = { isPending: false, mutate: (args: any) => {} } as any;
                     <SelectItem value="REPLY">Reply to Email</SelectItem>
                     <SelectItem value="FORWARD">Forward Email</SelectItem>
                     <SelectItem value="CREATE_DRAFT">Create Draft</SelectItem>
+                    <SelectItem value="GET_DRAFT">Get Draft</SelectItem>
+                    <SelectItem value="UPDATE_DRAFT">Update Draft</SelectItem>
+                    <SelectItem value="DELETE_DRAFT">Delete Draft</SelectItem>
                     <SelectItem value="SEND_DRAFT">Send Draft</SelectItem>
                     <SelectItem value="LIST_DRAFTS">List Drafts</SelectItem>
                   </SelectGroup>
@@ -359,21 +380,35 @@ const testMutation = { isPending: false, mutate: (args: any) => {} } as any;
                     <SelectItem value="GET_MESSAGE">Get Email</SelectItem>
                     <SelectItem value="LIST_MESSAGES">List Emails</SelectItem>
                     <SelectItem value="SEARCH_MESSAGES">Search Emails</SelectItem>
+                    <SelectItem value="LIST_THREADS">List Threads</SelectItem>
                     <SelectItem value="GET_THREAD">Get Thread</SelectItem>
                     <SelectItem value="GET_ATTACHMENT">Download Attachment</SelectItem>
                   </SelectGroup>
                   <SelectGroup>
-                    <SelectLabel>Organize</SelectLabel>
+                    <SelectLabel>Organize Messages</SelectLabel>
                     <SelectItem value="ADD_LABEL">Add Label</SelectItem>
                     <SelectItem value="REMOVE_LABEL">Remove Label</SelectItem>
                     <SelectItem value="MARK_READ">Mark as Read</SelectItem>
                     <SelectItem value="MARK_UNREAD">Mark as Unread</SelectItem>
                     <SelectItem value="MOVE_TO_TRASH">Move to Trash</SelectItem>
+                    <SelectItem value="UNTRASH_MESSAGE">Untrash Message</SelectItem>
+                    <SelectItem value="DELETE_MESSAGE">Delete Message (permanent)</SelectItem>
+                    <SelectItem value="BATCH_MODIFY">Batch Modify Labels</SelectItem>
+                  </SelectGroup>
+                  <SelectGroup>
+                    <SelectLabel>Threads</SelectLabel>
+                    <SelectItem value="MODIFY_THREAD">Modify Thread Labels</SelectItem>
+                    <SelectItem value="TRASH_THREAD">Trash Thread</SelectItem>
+                    <SelectItem value="UNTRASH_THREAD">Untrash Thread</SelectItem>
+                    <SelectItem value="DELETE_THREAD">Delete Thread (permanent)</SelectItem>
                   </SelectGroup>
                   <SelectGroup>
                     <SelectLabel>Labels</SelectLabel>
                     <SelectItem value="LIST_LABELS">List Labels</SelectItem>
+                    <SelectItem value="GET_LABEL">Get Label</SelectItem>
                     <SelectItem value="CREATE_LABEL">Create Label</SelectItem>
+                    <SelectItem value="UPDATE_LABEL">Update Label</SelectItem>
+                    <SelectItem value="DELETE_LABEL">Delete Label</SelectItem>
                   </SelectGroup>
                 </SelectContent>
               </Select>
@@ -743,8 +778,14 @@ const testMutation = { isPending: false, mutate: (args: any) => {} } as any;
               </>
             )}
 
-            {/* ── MARK_READ / MARK_UNREAD / MOVE_TO_TRASH ── */}
-            {(operation === "MARK_READ" || operation === "MARK_UNREAD" || operation === "MOVE_TO_TRASH") && (
+            {/* ── MARK_READ / MARK_UNREAD / MOVE_TO_TRASH / UNTRASH / DELETE ── */}
+            {(
+              operation === "MARK_READ" ||
+              operation === "MARK_UNREAD" ||
+              operation === "MOVE_TO_TRASH" ||
+              operation === "UNTRASH_MESSAGE" ||
+              operation === "DELETE_MESSAGE"
+            ) && (
               <div className="space-y-2">
                 <Label>Message ID *</Label>
                 <Input
@@ -752,7 +793,231 @@ const testMutation = { isPending: false, mutate: (args: any) => {} } as any;
                   value={messageId}
                   onChange={(e) => setMessageId(e.target.value)}
                 />
+                {operation === "DELETE_MESSAGE" && (
+                  <p className="text-xs text-destructive">
+                    Permanent delete — prefer Move to Trash when possible.
+                  </p>
+                )}
               </div>
+            )}
+
+            {/* ── BATCH_MODIFY ── */}
+            {operation === "BATCH_MODIFY" && (
+              <>
+                <div className="space-y-2">
+                  <Label>Message IDs *</Label>
+                  <Input
+                    placeholder="msg1,msg2 or {{gmail.messageId}}"
+                    value={messageIds}
+                    onChange={(e) => setMessageIds(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Comma-separated message IDs (or single messageId if empty)
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Add Label IDs</Label>
+                  <Input
+                    placeholder="STARRED,IMPORTANT"
+                    value={labelIds}
+                    onChange={(e) => setLabelIds(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Remove Label (single / comma list)</Label>
+                  <Input
+                    placeholder="UNREAD"
+                    value={labelName}
+                    onChange={(e) => setLabelName(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
+
+            {/* ── LIST_THREADS ── */}
+            {operation === "LIST_THREADS" && (
+              <>
+                <div className="space-y-2">
+                  <Label>Search Query</Label>
+                  <Input
+                    placeholder="is:unread newer_than:7d"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Label IDs</Label>
+                  <Input
+                    placeholder="INBOX"
+                    value={labelIds}
+                    onChange={(e) => setLabelIds(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Max Results</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={50}
+                    value={maxResults}
+                    onChange={(e) =>
+                      setMaxResults(
+                        Math.min(50, Math.max(1, parseInt(e.target.value) || 10)),
+                      )
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Page Token</Label>
+                  <Input
+                    placeholder="{{gmail.nextPageToken}}"
+                    value={pageToken}
+                    onChange={(e) => setPageToken(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
+
+            {/* ── MODIFY_THREAD / TRASH / UNTRASH / DELETE_THREAD ── */}
+            {(
+              operation === "MODIFY_THREAD" ||
+              operation === "TRASH_THREAD" ||
+              operation === "UNTRASH_THREAD" ||
+              operation === "DELETE_THREAD"
+            ) && (
+              <>
+                <div className="space-y-2">
+                  <Label>Thread ID *</Label>
+                  <Input
+                    placeholder="{{gmail.threadId}}"
+                    value={threadId}
+                    onChange={(e) => setThreadId(e.target.value)}
+                  />
+                </div>
+                {operation === "MODIFY_THREAD" && (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Add Label IDs *</Label>
+                      <Input
+                        placeholder="STARRED"
+                        value={labelIds}
+                        onChange={(e) => setLabelIds(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Remove Label IDs</Label>
+                      <Input
+                        placeholder="UNREAD"
+                        value={labelName}
+                        onChange={(e) => setLabelName(e.target.value)}
+                      />
+                    </div>
+                  </>
+                )}
+                {operation === "DELETE_THREAD" && (
+                  <p className="text-xs text-destructive">
+                    Permanent thread delete.
+                  </p>
+                )}
+              </>
+            )}
+
+            {/* ── GET_DRAFT / DELETE_DRAFT / SEND_DRAFT ── */}
+            {(
+              operation === "GET_DRAFT" ||
+              operation === "DELETE_DRAFT" ||
+              operation === "SEND_DRAFT"
+            ) && (
+              <>
+                <div className="space-y-2">
+                  <Label>Draft ID *</Label>
+                  <Input
+                    placeholder="{{gmail.draftId}}"
+                    value={draftId}
+                    onChange={(e) => setDraftId(e.target.value)}
+                  />
+                </div>
+                {operation === "GET_DRAFT" && (
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      checked={includeBody}
+                      onCheckedChange={setIncludeBody}
+                    />
+                    <Label>Include Full Body</Label>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* ── UPDATE_DRAFT ── */}
+            {operation === "UPDATE_DRAFT" && (
+              <>
+                <div className="space-y-2">
+                  <Label>Draft ID *</Label>
+                  <Input
+                    placeholder="{{gmail.draftId}}"
+                    value={draftId}
+                    onChange={(e) => setDraftId(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>To *</Label>
+                  <Input
+                    placeholder="customer@example.com"
+                    value={to}
+                    onChange={(e) => setTo(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Subject</Label>
+                  <Input
+                    placeholder="Updated subject"
+                    value={subject}
+                    onChange={(e) => setSubject(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Body</Label>
+                  <Textarea
+                    className="min-h-[120px]"
+                    placeholder="Updated body..."
+                    value={body}
+                    onChange={(e) => setBody(e.target.value)}
+                  />
+                </div>
+                <div className="flex items-center gap-3">
+                  <Switch checked={isHtml} onCheckedChange={setIsHtml} />
+                  <Label>HTML Mode</Label>
+                </div>
+              </>
+            )}
+
+            {/* ── GET_LABEL / UPDATE_LABEL / DELETE_LABEL ── */}
+            {(
+              operation === "GET_LABEL" ||
+              operation === "UPDATE_LABEL" ||
+              operation === "DELETE_LABEL"
+            ) && (
+              <>
+                <div className="space-y-2">
+                  <Label>Label ID *</Label>
+                  <Input
+                    placeholder="Label_123 or {{gmail.labelId}}"
+                    value={labelId}
+                    onChange={(e) => setLabelId(e.target.value)}
+                  />
+                </div>
+                {operation === "UPDATE_LABEL" && (
+                  <div className="space-y-2">
+                    <Label>New Label Name *</Label>
+                    <Input
+                      placeholder="Renamed Label"
+                      value={labelName}
+                      onChange={(e) => setLabelName(e.target.value)}
+                    />
+                  </div>
+                )}
+              </>
             )}
 
             {/* ── CREATE_DRAFT ── */}
@@ -887,18 +1152,6 @@ const testMutation = { isPending: false, mutate: (args: any) => {} } as any;
                   </p>
                 </div>
               </>
-            )}
-
-            {/* ── SEND_DRAFT ── */}
-            {operation === "SEND_DRAFT" && (
-              <div className="space-y-2">
-                <Label>Draft ID *</Label>
-                <Input
-                  placeholder="{{gmail.draftId}}"
-                  value={draftId}
-                  onChange={(e) => setDraftId(e.target.value)}
-                />
-              </div>
             )}
 
             {/* ── LIST_LABELS ── */}

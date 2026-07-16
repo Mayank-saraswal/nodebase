@@ -10,6 +10,7 @@ import {
   googleSheetsIntegrationDefinition,
   googleDriveIntegrationDefinition,
   slackIntegrationDefinition,
+  githubIntegrationDefinition,
   buildAliasMap,
   listOperationKeys,
 } from "../index"
@@ -188,5 +189,55 @@ describe("Option C registry completeness", () => {
     const map = buildAliasMap(slackIntegrationDefinition)
     expect(map.get("MESSAGE_SEND")).toBe("messages.post")
     expect(map.get("CHANNEL_LIST")).toBe("channels.list")
+  })
+
+  it("GitHub registry covers core Corsair endpoints", () => {
+    const keys = listOperationKeys(githubIntegrationDefinition)
+    const required = [
+      "issues.list",
+      "issues.get",
+      "issues.create",
+      "issues.update",
+      "issues.createComment",
+      "pullRequests.list",
+      "pullRequests.get",
+      "pullRequests.listReviews",
+      "pullRequests.createReview",
+      "repositories.list",
+      "repositories.get",
+      "repositories.listBranches",
+      "repositories.listCommits",
+      "repositories.getContent",
+      "repositories.star",
+      "repositories.unstar",
+      "repositories.checkStarred",
+      "repositories.listStarred",
+      "releases.list",
+      "releases.get",
+      "releases.create",
+      "releases.update",
+      "workflows.list",
+      "workflows.get",
+      "workflows.listRuns",
+      "discussions.list",
+      "discussions.get",
+      "forks.list",
+      "comments.list",
+      "comments.listForIssue",
+      "comments.get",
+      "comments.update",
+      "comments.delete",
+      "events.list",
+      "events.listForRepository",
+      "users.get",
+      "users.getAuthenticated",
+    ]
+    expect(corsairKeysCovered(keys, required)).toEqual([])
+  })
+
+  it("GitHub aliases resolve ISSUE_LIST → issues.list", () => {
+    const map = buildAliasMap(githubIntegrationDefinition)
+    expect(map.get("ISSUE_LIST")).toBe("issues.list")
+    expect(map.get("USER_GET_CURRENT")).toBe("users.getAuthenticated")
   })
 })
