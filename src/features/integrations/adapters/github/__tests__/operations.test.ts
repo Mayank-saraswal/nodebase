@@ -177,4 +177,135 @@ describe("runGithubOperation (Corsair surface)", () => {
       runGithubOperation(client, fields({ operation: "NOT_REAL" })),
     ).rejects.toThrow(/unknown operation/i)
   })
+
+  // ── Edge cases ──
+
+  it("requires owner/repo for repo-scoped ops", async () => {
+    await expect(
+      runGithubOperation(
+        client,
+        fields({ operation: "ISSUE_LIST", owner: "", repo: "" }),
+      ),
+    ).rejects.toThrow(/owner and repo/)
+  })
+
+  it("ISSUE_GET requires numeric issueNumber", async () => {
+    await expect(
+      runGithubOperation(
+        client,
+        fields({ operation: "ISSUE_GET", issueNumber: "  " }),
+      ),
+    ).rejects.toThrow(/issueNumber/)
+  })
+
+  it("ISSUE_CLOSE maps to state closed", async () => {
+    await runGithubOperation(
+      client,
+      fields({ operation: "ISSUE_CLOSE", issueNumber: "1" }),
+    )
+    expect(client.github.api.issues.update).toHaveBeenCalledWith(
+      expect.objectContaining({ issue_number: 1, state: "closed" }),
+    )
+  })
+
+  it("ISSUE_REOPEN maps to state open", async () => {
+    await runGithubOperation(
+      client,
+      fields({ operation: "ISSUE_REOPEN", issueNumber: "2" }),
+    )
+    expect(client.github.api.issues.update).toHaveBeenCalledWith(
+      expect.objectContaining({ issue_number: 2, state: "open" }),
+    )
+  })
+
+  it("ISSUE_CREATE_COMMENT requires body", async () => {
+    await expect(
+      runGithubOperation(
+        client,
+        fields({
+          operation: "ISSUE_CREATE_COMMENT",
+          issueNumber: "1",
+          body: "",
+        }),
+      ),
+    ).rejects.toThrow(/body/)
+  })
+
+  it("PULL_REQUEST_GET requires pullNumber", async () => {
+    await expect(
+      runGithubOperation(
+        client,
+        fields({ operation: "PULL_REQUEST_GET", pullNumber: "" }),
+      ),
+    ).rejects.toThrow(/pullNumber/)
+  })
+
+  it("FILE_GET requires path", async () => {
+    await expect(
+      runGithubOperation(client, fields({ operation: "FILE_GET", path: "" })),
+    ).rejects.toThrow(/path/)
+  })
+
+  it("RELEASE_CREATE requires tagName", async () => {
+    await expect(
+      runGithubOperation(
+        client,
+        fields({ operation: "RELEASE_CREATE", tagName: "" }),
+      ),
+    ).rejects.toThrow(/tagName/)
+  })
+
+  it("USER_GET requires username", async () => {
+    await expect(
+      runGithubOperation(
+        client,
+        fields({ operation: "USER_GET", username: "" }),
+      ),
+    ).rejects.toThrow(/username/)
+  })
+
+  it("COMMENT_DELETE requires commentId", async () => {
+    await expect(
+      runGithubOperation(
+        client,
+        fields({ operation: "ISSUE_DELETE_COMMENT", commentId: "" }),
+      ),
+    ).rejects.toThrow(/commentId/)
+  })
+
+  it("whitespace-only owner is rejected", async () => {
+    await expect(
+      runGithubOperation(
+        client,
+        fields({ operation: "REPOSITORY_GET", owner: "   ", repo: "x" }),
+      ),
+    ).rejects.toThrow(/owner and repo/)
+  })
+
+  it("ISSUE_CREATE with labels/assignees splits CSV", async () => {
+    await runGithubOperation(
+      client,
+      fields({
+        operation: "ISSUE_CREATE",
+        title: "T",
+        labels: "bug, help wanted",
+        assignees: "ada, bob",
+      }),
+    )
+    expect(client.github.api.issues.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        labels: ["bug", "help wanted"],
+        assignees: ["ada", "bob"],
+      }),
+    )
+  })
+
+  it("WORKFLOW_GET requires workflowId", async () => {
+    await expect(
+      runGithubOperation(
+        client,
+        fields({ operation: "WORKFLOW_GET", workflowId: "" }),
+      ),
+    ).rejects.toThrow(/workflowId/)
+  })
 })

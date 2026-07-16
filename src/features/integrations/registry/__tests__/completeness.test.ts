@@ -12,6 +12,7 @@ import {
   slackIntegrationDefinition,
   githubIntegrationDefinition,
   notionIntegrationDefinition,
+  hubspotIntegrationDefinition,
   buildAliasMap,
   listOperationKeys,
 } from "../index"
@@ -268,5 +269,47 @@ describe("Option C registry completeness", () => {
     expect(map.get("QUERY_DATABASE")).toBe(
       "databasePages.getManyDatabasePages",
     )
+  })
+
+  it("HubSpot registry covers all Corsair endpoints", () => {
+    const keys = listOperationKeys(hubspotIntegrationDefinition)
+    const required = [
+      "contacts.get",
+      "contacts.getMany",
+      "contacts.create",
+      "contacts.update",
+      "contacts.delete",
+      "contacts.getRecentlyCreated",
+      "contacts.getRecentlyUpdated",
+      "contacts.search",
+      "companies.get",
+      "companies.getMany",
+      "companies.create",
+      "companies.update",
+      "companies.delete",
+      "companies.getRecentlyCreated",
+      "companies.getRecentlyUpdated",
+      "companies.searchByDomain",
+      "deals.get",
+      "deals.getMany",
+      "deals.create",
+      "deals.update",
+      "deals.delete",
+      "deals.getRecentlyCreated",
+      "deals.getRecentlyUpdated",
+      "deals.search",
+      "tickets.get",
+      "tickets.getMany",
+      "tickets.create",
+      "tickets.update",
+      "tickets.delete",
+      "engagements.get",
+      "engagements.getMany",
+      "engagements.create",
+      "engagements.delete",
+      "contactLists.addContact",
+      "contactLists.removeContact",
+    ]
+    expect(corsairKeysCovered(keys, required)).toEqual([])
   })
 })

@@ -6,6 +6,7 @@ import { googledrive } from "@corsair-dev/googledrive"
 import { slack } from "@corsair-dev/slack"
 import { github } from "@corsair-dev/github"
 import { notion } from "@corsair-dev/notion"
+import { hubspot } from "@corsair-dev/hubspot"
 import { getCorsairPool } from "./pool"
 import {
   getAppUrl,
@@ -59,6 +60,9 @@ function buildCorsair() {
         permissions: { mode: "open" },
       }),
       notion({
+        permissions: { mode: "open" },
+      }),
+      hubspot({
         permissions: { mode: "open" },
       }),
     ],

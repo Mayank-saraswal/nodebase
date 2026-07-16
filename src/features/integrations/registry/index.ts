@@ -6,6 +6,7 @@ import { googleDriveIntegrationDefinition } from "./integrations/google-drive"
 import { slackIntegrationDefinition } from "./integrations/slack"
 import { githubIntegrationDefinition } from "./integrations/github"
 import { notionIntegrationDefinition } from "./integrations/notion"
+import { hubspotIntegrationDefinition } from "./integrations/hubspot"
 import { resolveOperation, buildAliasMap, listOperationKeys } from "./resolve"
 import type { IntegrationDefinition } from "./types"
 
@@ -27,6 +28,7 @@ const BY_TYPE_KEY: Record<string, IntegrationDefinition> = {
   slack: slackIntegrationDefinition,
   github: githubIntegrationDefinition,
   notion: notionIntegrationDefinition,
+  hubspot: hubspotIntegrationDefinition,
 }
 
 /** Map Prisma NodeType → registry typeKey */
@@ -122,4 +124,5 @@ export {
   slackIntegrationDefinition,
   githubIntegrationDefinition,
   notionIntegrationDefinition,
+  hubspotIntegrationDefinition,
 }

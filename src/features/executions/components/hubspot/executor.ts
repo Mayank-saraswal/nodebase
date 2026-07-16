@@ -1,10 +1,18 @@
 import { NonRetriableError, RetryAfterError } from "inngest"
-import type { NodeExecutor } from "@/features/executions/types"
+import type { NodeExecutor, WorkflowContext } from "@/features/executions/types"
+import { asString } from "@/features/executions/types"
 import prisma from "@/lib/db"
 import { decrypt, encrypt } from "@/lib/encryption"
 import { resolveTemplate } from "@/features/executions/lib/template-resolver"
 import { hubspotChannel } from "@/inngest/channels/hubspot"
 import { HubspotOperation } from "@/features/executions/enums"
+import {
+  mapCorsairError,
+  resolveTenantId,
+} from "@/lib/corsair"
+import { tryRunIntegration } from "@/features/integrations/runner"
+import { isHubspotCorsairOp } from "@/features/integrations/adapters/hubspot/operations"
+import { NodeType } from "@/generated/prisma"
 
 const HUBSPOT_API_BASE = "https://api.hubapi.com"
 const HUBSPOT_TOKEN_URL = "https://api.hubapi.com/oauth/v1/token"
@@ -140,26 +148,91 @@ function parseCustomProperties(customProps: string): Record<string, unknown> {
   }
 }
 
-export const hubspotExecutor: NodeExecutor = async ({ data, nodeId, context, step, publish }) => {
-  const config = data as any;
+export const hubspotExecutor: NodeExecutor = async ({
+  data,
+  nodeId,
+  context,
+  step,
+  publish,
+  userId,
+  tenantId: tenantIdParam,
+}): Promise<WorkflowContext> => {
+  // unknown: Node.data JSON boundary
+  const config = (data ?? {}) as Record<string, unknown>
+  const credentialId = asString(config.credentialId)
+  const operation = asString(config.operation, "GET_CONTACT")
 
-await step.run(`hubspot-${nodeId}-validate`, async () => {
-    if (!config) throw new NonRetriableError("HubSpot node not configured")
-    if (!config.credentialId || !config.credential) {
+  await publish(
+    await hubspotChannel(nodeId)().status({ nodeId, status: "loading" }),
+  )
+
+  // ── Corsair path for ops covered by @corsair-dev/hubspot ──
+  if (isHubspotCorsairOp(operation) && userId) {
+    const tenantId =
+      tenantIdParam && tenantIdParam.trim() !== ""
+        ? tenantIdParam
+        : resolveTenantId({ userId })
+    try {
+      const corsairResult = await step.run(
+        `hubspot-${nodeId}-corsair`,
+        async () => {
+          return tryRunIntegration({
+            nodeType: NodeType.HUBSPOT,
+            data: config,
+            context,
+            nodeId,
+            userId,
+            tenantId,
+          })
+        },
+      )
+      if (corsairResult) {
+        await publish(
+          await hubspotChannel(nodeId)().status({
+            nodeId,
+            status: "success",
+          }),
+        )
+        return corsairResult.context
+      }
+    } catch (error) {
+      await publish(
+        await hubspotChannel(nodeId)().status({ nodeId, status: "error" }),
+      )
+      if (
+        error instanceof NonRetriableError ||
+        error instanceof RetryAfterError
+      ) {
+        throw error
+      }
+      mapCorsairError(error, "HubSpot")
+    }
+  }
+
+  await step.run(`hubspot-${nodeId}-validate`, async () => {
+    if (!credentialId) {
       throw new NonRetriableError("HubSpot: No credential connected.")
     }
     return { valid: true }
   })
 
-  if (!config || !config.credentialId || !config.credential) {
+  // Legacy path needs credential value from DB
+  const credential = await step.run(`hubspot-${nodeId}-load-credential`, async () => {
+    if (!credentialId || !userId) return null
+    return prisma.credential.findUnique({
+      where: { id: credentialId, userId },
+    })
+  })
+
+  if (!credential) {
     throw new NonRetriableError("HubSpot: Missing credential.")
   }
 
   const accessToken = await step.run(`hubspot-${nodeId}-token`, () =>
-    getValidAccessToken(config.credentialId!, config.credential!.value)
+    getValidAccessToken(credentialId, credential.value)
   )
 
-  const r = (field: string) => resolveTemplate(field, context) as string
+  const r = (field: unknown) => resolveTemplate(asString(field), context)
   const customProps = parseCustomProperties(r(config.customProperties))
 
   const buildContactProps = () =>
@@ -217,7 +290,7 @@ await step.run(`hubspot-${nodeId}-validate`, async () => {
   try {
     result = await step.run(`hubspot-${nodeId}-execute`, async () => {
       await publish(await hubspotChannel(nodeId)().status({ nodeId, status: "loading" }))
-      switch (config.operation) {
+      switch (operation) {
         case HubspotOperation.CREATE_CONTACT: {
           const properties = buildContactProps()
           const data = await hubspotApi("POST", "/crm/v3/objects/contacts", accessToken, { properties })
@@ -536,7 +609,11 @@ await step.run(`hubspot-${nodeId}-validate`, async () => {
             `/contacts/v1/lists/${listId}/contacts/all`,
             accessToken,
             undefined,
-            { count: config.limit ?? 10, vidOffset: r(config.after) || undefined }
+            {
+              count:
+                typeof config.limit === "number" ? config.limit : 10,
+              vidOffset: r(config.after) || undefined,
+            }
           )
           return { operation: "GET_LIST_CONTACTS", ...data }
         }
@@ -566,14 +643,14 @@ await step.run(`hubspot-${nodeId}-validate`, async () => {
           return { operation: "GET_PROPERTIES", ...data }
         }
         default:
-          throw new NonRetriableError(`HubSpot: Unsupported operation ${config.operation}`)
+          throw new NonRetriableError(`HubSpot: Unsupported operation ${operation}`)
       }
     })
   } catch (err) {
     if (err instanceof NonRetriableError || err instanceof RetryAfterError) {
       if (config?.continueOnFail) {
         result = {
-          operation: config.operation,
+          operation,
           success: false,
           error: err.message,
         }
