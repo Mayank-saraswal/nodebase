@@ -19,11 +19,15 @@ import {
   razorpayIntegrationDefinition,
   stripeIntegrationDefinition,
   openaiIntegrationDefinition,
+  geminiIntegrationDefinition,
+  deepseekIntegrationDefinition,
   buildAliasMap,
   listOperationKeys,
 } from "../index"
 import { STRIPE_CORSAIR_ENDPOINTS } from "../integrations/stripe"
 import { OPENAI_CORSAIR_ENDPOINTS } from "../integrations/openai"
+import { GEMINI_CORSAIR_ENDPOINTS } from "../integrations/gemini"
+import { DEEPSEEK_CORSAIR_ENDPOINTS } from "../integrations/deepseek"
 
 /** Public Corsair Gmail endpoint paths (from @corsair-dev/gmail dist endpoints) */
 const GMAIL_CORSAIR_ENDPOINTS = [
@@ -455,5 +459,33 @@ describe("Option C registry completeness", () => {
     expect(map.get("CHAT")).toBe("chat.createCompletion")
     expect(map.get("EMBED")).toBe("embeddings.create")
     expect(map.get("IMAGE")).toBe("images.create")
+  })
+
+  it("Gemini registry covers all Corsair endpoints (8)", () => {
+    const keys = listOperationKeys(geminiIntegrationDefinition)
+    expect(corsairKeysCovered(keys, GEMINI_CORSAIR_ENDPOINTS)).toEqual([])
+    expect(keys.length).toBe(GEMINI_CORSAIR_ENDPOINTS.length)
+    expect(GEMINI_CORSAIR_ENDPOINTS.length).toBe(8)
+  })
+
+  it("Gemini aliases resolve CHAT / IMAGE", () => {
+    const map = buildAliasMap(geminiIntegrationDefinition)
+    expect(map.get("CHAT")).toBe("content.generateContent")
+    expect(map.get("IMAGE")).toBe("images.generateImage")
+    expect(map.get("LIST_MODELS")).toBe("models.listModels")
+  })
+
+  it("DeepSeek registry covers all Corsair endpoints (4)", () => {
+    const keys = listOperationKeys(deepseekIntegrationDefinition)
+    expect(corsairKeysCovered(keys, DEEPSEEK_CORSAIR_ENDPOINTS)).toEqual([])
+    expect(keys.length).toBe(DEEPSEEK_CORSAIR_ENDPOINTS.length)
+    expect(DEEPSEEK_CORSAIR_ENDPOINTS.length).toBe(4)
+  })
+
+  it("DeepSeek aliases resolve CHAT / GET_BALANCE", () => {
+    const map = buildAliasMap(deepseekIntegrationDefinition)
+    expect(map.get("CHAT")).toBe("chat.createCompletion")
+    expect(map.get("GET_BALANCE")).toBe("user.getBalance")
+    expect(map.get("ANTHROPIC_MESSAGE")).toBe("anthropic.createMessage")
   })
 })

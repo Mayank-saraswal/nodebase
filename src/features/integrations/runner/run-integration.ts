@@ -44,6 +44,8 @@ import { twitterAdapter } from "@/features/integrations/adapters/twitter/adapter
 import { razorpayAdapter } from "@/features/integrations/adapters/razorpay/adapter"
 import { stripeAdapter } from "@/features/integrations/adapters/stripe/adapter"
 import { openaiAdapter } from "@/features/integrations/adapters/openai/adapter"
+import { geminiAdapter } from "@/features/integrations/adapters/gemini/adapter"
+import { deepseekAdapter } from "@/features/integrations/adapters/deepseek/adapter"
 
 /** Adapter map keyed by Corsair plugin id */
 const ADAPTERS: Partial<Record<CorsairPluginId, IntegrationAdapter>> = {
@@ -60,6 +62,8 @@ const ADAPTERS: Partial<Record<CorsairPluginId, IntegrationAdapter>> = {
   razorpay: razorpayAdapter,
   stripe: stripeAdapter,
   openai: openaiAdapter,
+  gemini: geminiAdapter,
+  deepseek: deepseekAdapter,
 }
 
 export type RunIntegrationParams = {

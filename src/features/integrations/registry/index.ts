@@ -13,6 +13,8 @@ import { twitterIntegrationDefinition } from "./integrations/twitter"
 import { razorpayIntegrationDefinition } from "./integrations/razorpay"
 import { stripeIntegrationDefinition } from "./integrations/stripe"
 import { openaiIntegrationDefinition } from "./integrations/openai"
+import { geminiIntegrationDefinition } from "./integrations/gemini"
+import { deepseekIntegrationDefinition } from "./integrations/deepseek"
 import { resolveOperation, buildAliasMap, listOperationKeys } from "./resolve"
 import type { IntegrationDefinition } from "./types"
 
@@ -41,6 +43,8 @@ const BY_TYPE_KEY: Record<string, IntegrationDefinition> = {
   razorpay: razorpayIntegrationDefinition,
   stripe: stripeIntegrationDefinition,
   openai: openaiIntegrationDefinition,
+  gemini: geminiIntegrationDefinition,
+  deepseek: deepseekIntegrationDefinition,
 }
 
 /** Map Prisma NodeType → registry typeKey */
@@ -143,4 +147,6 @@ export {
   razorpayIntegrationDefinition,
   stripeIntegrationDefinition,
   openaiIntegrationDefinition,
+  geminiIntegrationDefinition,
+  deepseekIntegrationDefinition,
 }

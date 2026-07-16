@@ -10,6 +10,8 @@ import { discordExecutor } from "../components/discord/executor";
 import { slackExecutor } from "../components/slack/executor";
 import { aiExecutor } from "../components/ai/executor";
 import { openAiExecutor } from "../components/openai/executor";
+import { geminiExecutor } from "../components/gemini/executor";
+import { deepseekExecutor } from "../components/deepseek/executor";
 import { telegramExecutor } from "../components/telegram/executor";
 import { xExecutor } from "../components/x/executor";
 import { workdayExecutor } from "../components/workday/executor";
@@ -52,14 +54,14 @@ export const executorRegistry = {
     [NodeType.STRIPE_TRIGGER]: stripeTriggerExecutor,
     [NodeType.WEBHOOK_TRIGGER]: webhookTriggerExecutor,
     [NodeType.SCHEDULE_TRIGGER]: scheduleTriggerExecutor,
-    [NodeType.GEMINI]: aiExecutor,
+    [NodeType.GEMINI]: geminiExecutor,
     [NodeType.ANTHROPIC]: aiExecutor,
     [NodeType.OPENAI]: openAiExecutor,
     [NodeType.XAI]: aiExecutor,
     [NodeType.DISCORD]: discordExecutor,
     [NodeType.SLACK]: slackExecutor,
     [NodeType.PERPLEXITY]: aiExecutor,
-    [NodeType.DEEPSEEK]: aiExecutor,
+    [NodeType.DEEPSEEK]: deepseekExecutor,
     [NodeType.GROQ]: aiExecutor,
     [NodeType.TELEGRAM]: telegramExecutor,
     [NodeType.X]: xExecutor,

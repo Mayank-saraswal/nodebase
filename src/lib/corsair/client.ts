@@ -13,6 +13,8 @@ import { twitter } from "@corsair-dev/twitter"
 import { razorpay } from "@corsair-dev/razorpay"
 import { stripe } from "@corsair-dev/stripe"
 import { openai } from "@corsair-dev/openai"
+import { gemini } from "@corsair-dev/gemini"
+import { deepseek } from "@corsair-dev/deepseek"
 import { getCorsairPool } from "./pool"
 import {
   getAppUrl,
@@ -86,6 +88,12 @@ function buildCorsair() {
         permissions: { mode: "open" },
       }),
       openai({
+        permissions: { mode: "open" },
+      }),
+      gemini({
+        permissions: { mode: "open" },
+      }),
+      deepseek({
         permissions: { mode: "open" },
       }),
     ],
