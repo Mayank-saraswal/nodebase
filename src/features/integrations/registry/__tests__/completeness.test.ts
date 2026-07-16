@@ -15,6 +15,7 @@ import {
   hubspotIntegrationDefinition,
   telegramIntegrationDefinition,
   discordIntegrationDefinition,
+  twitterIntegrationDefinition,
   buildAliasMap,
   listOperationKeys,
 } from "../index"
@@ -373,5 +374,17 @@ describe("Option C registry completeness", () => {
     const map = buildAliasMap(discordIntegrationDefinition)
     expect(map.get("SEND_MESSAGE")).toBe("messages.send")
     expect(map.get("LIST_GUILDS")).toBe("guilds.list")
+  })
+
+  it("Twitter registry covers all Corsair endpoints", () => {
+    const keys = listOperationKeys(twitterIntegrationDefinition)
+    const required = ["tweets.create", "tweets.createReply"]
+    expect(corsairKeysCovered(keys, required)).toEqual([])
+  })
+
+  it("Twitter aliases resolve POST_TWEET", () => {
+    const map = buildAliasMap(twitterIntegrationDefinition)
+    expect(map.get("POST_TWEET")).toBe("tweets.create")
+    expect(map.get("REPLY_TWEET")).toBe("tweets.createReply")
   })
 })
