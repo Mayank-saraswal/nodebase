@@ -8,10 +8,13 @@ import { useNodeStatus } from "@/features/triggers/components/shared/hooks/use-n
 import { fetchDiscordRealtimeToken} from "./actions"
 import { DISCORD_CHANNEL_NAME } from "@/inngest/channels/discord"
 
-type DiscordNodeData ={
-    webhookUrl?:string
-    content?:string
-    username?:string
+type DiscordNodeData = {
+    webhookUrl?: string
+    content?: string
+    username?: string
+    operation?: string
+    channelId?: string
+    variableName?: string
 }
 
 
@@ -44,9 +47,15 @@ export const DiscordNode = memo((props:NodeProps<DiscordNodeType>)=>{
     }))
             
     }
-    const nodeData = props.data 
+    const nodeData = props.data
+    const op = nodeData?.operation || "SEND_MESSAGE"
     const description = nodeData?.content
-    ?` Send: ${nodeData.content.slice(0,50)}...`:"Not configured"
+      ? `${op}: ${nodeData.content.slice(0, 40)}…`
+      : nodeData?.channelId
+        ? `${op} · #${nodeData.channelId.slice(0, 12)}`
+        : nodeData?.webhookUrl
+          ? "Webhook configured"
+          : "Not configured"
     
     return(
         <>

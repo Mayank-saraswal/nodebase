@@ -1,10 +1,17 @@
-import { NonRetriableError } from "inngest"
-import type { NodeExecutor } from "@/features/executions/types"
+import { NonRetriableError, RetryAfterError } from "inngest"
+import type { NodeExecutor, WorkflowContext } from "@/features/executions/types"
+import { asString } from "@/features/executions/types"
 import prisma from "@/lib/db"
 import { decrypt } from "@/lib/encryption"
 import { resolveTemplate } from "@/features/executions/lib/template-resolver"
 import { notionChannel } from "@/inngest/channels/notion"
-import { NotionOperation } from "@/generated/prisma"
+import { NotionOperation } from "@/features/executions/enums"
+import {
+  mapCorsairError,
+  resolveTenantId,
+} from "@/lib/corsair"
+import { tryRunIntegration } from "@/features/integrations/runner"
+import { NodeType } from "@/generated/prisma"
 
 interface NotionCredential {
   apiKey: string
@@ -47,48 +54,87 @@ async function notionRequest(
 }
 
 export const notionExecutor: NodeExecutor<NotionData> = async ({
+  data,
   nodeId,
   context,
   step,
   publish,
   userId,
-}) => {
+  tenantId: tenantIdParam,
+}): Promise<WorkflowContext> => {
   await publish(
     notionChannel().status({
       nodeId,
       status: "loading",
-    })
+    }),
   )
 
-  // Step 1: Load config
-  const config = await step.run(`notion-${nodeId}-load-config`, async () => {
-    return prisma.notionNode.findUnique({ where: { nodeId } })
-  })
+  // unknown: Node.data JSON boundary
+  const config = (data ?? {}) as Record<string, unknown>
+  const credentialId = asString(config.credentialId)
 
-  if (!config) {
+  if (Object.keys(config).length === 0) {
     await publish(
       notionChannel().status({
         nodeId,
         status: "error",
-      })
+      }),
     )
     throw new NonRetriableError(
-      "Notion node not configured. Open settings to configure."
+      "Notion node not configured. Open settings to configure.",
     )
   }
 
-  // Step 2: Load and decrypt credential
+  // ── Corsair multi-tenant path ──
+  {
+    const tenantId =
+      tenantIdParam && tenantIdParam.trim() !== ""
+        ? tenantIdParam
+        : resolveTenantId({ userId })
+    try {
+      const corsairResult = await step.run(
+        `notion-${nodeId}-corsair`,
+        async () => {
+          return tryRunIntegration({
+            nodeType: NodeType.NOTION,
+            data: config,
+            context,
+            nodeId,
+            userId,
+            tenantId,
+          })
+        },
+      )
+      if (corsairResult) {
+        await publish(
+          notionChannel().status({ nodeId, status: "success" }),
+        )
+        return corsairResult.context
+      }
+    } catch (error) {
+      await publish(notionChannel().status({ nodeId, status: "error" }))
+      if (
+        error instanceof NonRetriableError ||
+        error instanceof RetryAfterError
+      ) {
+        throw error
+      }
+      mapCorsairError(error, "Notion")
+    }
+  }
+
+  // ── Legacy Cryptr + Notion REST ──
   const credential = await step.run(
     `notion-${nodeId}-load-credential`,
     async () => {
-      if (!config.credentialId) return null
+      if (!credentialId) return null
       return prisma.credential.findUnique({
         where: {
-          id: config.credentialId,
+          id: credentialId,
           userId,
         },
       })
-    }
+    },
   )
 
   if (!credential) {
@@ -139,47 +185,65 @@ export const notionExecutor: NodeExecutor<NotionData> = async ({
   // Step 3: Execute the operation
   try {
     const result = await step.run(`notion-${nodeId}-execute`, async () => {
-      const databaseId = resolveTemplate(config.databaseId, context)
-      const pageId = resolveTemplate(config.pageId, context)
-      const searchQuery = resolveTemplate(config.searchQuery, context)
-      const blockContent = resolveTemplate(config.blockContent, context)
-      const notionUserId = resolveTemplate(config.notionUserId, context)
-      const startCursor = resolveTemplate(config.startCursor, context)
+      const operation = asString(config.operation, "QUERY_DATABASE")
+      const databaseId = resolveTemplate(asString(config.databaseId), context)
+      const pageId = resolveTemplate(asString(config.pageId), context)
+      const searchQuery = resolveTemplate(asString(config.searchQuery), context)
+      const blockContent = resolveTemplate(asString(config.blockContent), context)
+      const notionUserId = resolveTemplate(asString(config.notionUserId), context)
+      const startCursor = resolveTemplate(asString(config.startCursor), context)
+      const pageSize =
+        typeof config.pageSize === "number" ? config.pageSize : 100
 
       let filterObj: Record<string, unknown> = {}
       try {
-        const resolved = resolveTemplate(config.filterJson, context)
-        filterObj = JSON.parse(resolved)
+        const resolved = resolveTemplate(
+          asString(config.filterJson, "{}"),
+          context,
+        )
+        filterObj = JSON.parse(resolved) as Record<string, unknown>
       } catch {
-        throw new NonRetriableError(`[Notion] Failed to parse filterJson for node ${nodeId}`)
+        throw new NonRetriableError(
+          `[Notion] Failed to parse filterJson for node ${nodeId}`,
+        )
       }
 
       let sortsArr: unknown[] = []
       try {
-        const resolved = resolveTemplate(config.sortsJson, context)
-        sortsArr = JSON.parse(resolved)
+        const resolved = resolveTemplate(
+          asString(config.sortsJson, "[]"),
+          context,
+        )
+        sortsArr = JSON.parse(resolved) as unknown[]
       } catch {
-        throw new NonRetriableError(`[Notion] Failed to parse sortsJson for node ${nodeId}`)
+        throw new NonRetriableError(
+          `[Notion] Failed to parse sortsJson for node ${nodeId}`,
+        )
       }
 
       let propertiesObj: Record<string, unknown> = {}
       try {
-        const resolved = resolveTemplate(config.propertiesJson, context)
-        propertiesObj = JSON.parse(resolved)
+        const resolved = resolveTemplate(
+          asString(config.propertiesJson, "{}"),
+          context,
+        )
+        propertiesObj = JSON.parse(resolved) as Record<string, unknown>
       } catch {
-        throw new NonRetriableError(`[Notion] Failed to parse propertiesJson for node ${nodeId}`)
+        throw new NonRetriableError(
+          `[Notion] Failed to parse propertiesJson for node ${nodeId}`,
+        )
       }
 
       let data: Record<string, unknown>
 
-      switch (config.operation) {
+      switch (operation) {
         case NotionOperation.QUERY_DATABASE: {
           if (!databaseId)
             throw new NonRetriableError(
               "Notion QUERY_DATABASE: 'databaseId' is required"
             )
           const body: Record<string, unknown> = {
-            page_size: config.pageSize,
+            page_size: pageSize,
           }
           if (Object.keys(filterObj).length > 0) body.filter = filterObj
           if (sortsArr.length > 0) body.sorts = sortsArr
@@ -188,7 +252,7 @@ export const notionExecutor: NodeExecutor<NotionData> = async ({
             "POST",
             `/databases/${databaseId}/query`,
             creds.apiKey,
-            body
+            body,
           )
           break
         }
@@ -343,7 +407,7 @@ export const notionExecutor: NodeExecutor<NotionData> = async ({
         }
 
         case NotionOperation.GET_USERS: {
-          let path = `/users?page_size=${config.pageSize}`
+          let path = `/users?page_size=${pageSize}`
           if (startCursor) path += `&start_cursor=${startCursor}`
           data = await notionRequest("GET", path, creds.apiKey)
           break
@@ -351,14 +415,14 @@ export const notionExecutor: NodeExecutor<NotionData> = async ({
 
         default:
           throw new NonRetriableError(
-            `Unknown Notion operation: ${config.operation}`
+            `Unknown Notion operation: ${operation}`,
           )
       }
 
       return {
         ...context,
         notion: {
-          operation: config.operation,
+          operation,
           data,
           timestamp: new Date().toISOString(),
         },
@@ -369,10 +433,10 @@ export const notionExecutor: NodeExecutor<NotionData> = async ({
       notionChannel().status({
         nodeId,
         status: "success",
-      })
+      }),
     )
 
-    return result as Record<string, unknown>
+    return result
   } catch (error) {
     await publish(
       notionChannel().status({

@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import Link from "next/link";
 import { GoogleConnectButton } from "@/components/google-connect-button";
+import { GithubConnectButton } from "@/components/github-connect-button";
 
 
 const formSchema = z.object({
@@ -60,6 +61,8 @@ const formSchema = z.object({
     postgresUser: z.string().optional(),
     postgresPassword: z.string().optional(),
     postgresSsl: z.enum(["disable", "require", "verify-full"]).optional(),
+    githubAccessToken: z.string().optional(),
+    githubBaseUrl: z.string().optional(),
 }).superRefine((data, ctx) => {
     if (data.type === CredentialType.GMAIL) {
         // Gmail now uses OAuth2 via GoogleConnectButton — no required form fields
@@ -215,6 +218,15 @@ const formSchema = z.object({
         if (!data.postgresUser) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "User is required", path: ["postgresUser"] })
         if (!data.postgresPassword) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Password is required", path: ["postgresPassword"] })
     }
+    if (data.type === CredentialType.GITHUB || data.type === CredentialType.GITHUB_APP) {
+        if (!data.githubAccessToken) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "Access Token is required",
+                path: ["githubAccessToken"],
+            })
+        }
+    }
     if (data.type === CredentialType.SLACK) {
         if (data.slackAuthType === "bot_token" && !data.slackBotToken) {
             ctx.addIssue({
@@ -349,6 +361,11 @@ const credentialTypeOptions = [
         label: "PostgreSQL",
         logo: "/logos/postgres.svg"
     },
+    {
+        value: CredentialType.GITHUB_APP,
+        label: "GitHub App",
+        logo: "/logos/github.svg"
+    },
 
 ]
 
@@ -360,6 +377,8 @@ interface CredentialsFormPage {
         value?: string;
         connectedEmail?: string;
         isGoogleOAuth?: boolean;
+        connectedGithubUsername?: string;
+        isGithubOAuth?: boolean;
     }
 };
 
@@ -379,12 +398,22 @@ export const CredentialForm = ({ initialData }: CredentialsFormPage) => {
     const [existingRefreshToken, setExistingRefreshToken] = useState<string | undefined>()
     const [isJustConnected, setIsJustConnected] = useState(false)
 
+    // GitHub OAuth state
+    const [connectedGithubUsername, setConnectedGithubUsername] = useState<string | undefined>()
+    const [isGithubOAuth, setIsGithubOAuth] = useState(false)
+
     useEffect(() => {
         if (initialData?.connectedEmail) {
             setConnectedEmail(initialData.connectedEmail)
         }
         if (initialData?.isGoogleOAuth) {
             setExistingRefreshToken("oauth-connected") // truthy marker, not actual token
+        }
+        if (initialData?.connectedGithubUsername) {
+            setConnectedGithubUsername(initialData.connectedGithubUsername)
+        }
+        if (initialData?.isGithubOAuth) {
+            setIsGithubOAuth(true)
         }
     }, [initialData])
 
@@ -401,6 +430,18 @@ export const CredentialForm = ({ initialData }: CredentialsFormPage) => {
         const googleError = params.get("google_error")
         if (googleError) {
             toast.error(`Google connection failed: ${decodeURIComponent(googleError)}`)
+            window.history.replaceState({}, "", window.location.pathname)
+        }
+        const githubSuccess = params.get("github_success")
+        if (githubSuccess) {
+            setConnectedGithubUsername(githubSuccess)
+            setIsGithubOAuth(true)
+            toast.success(`Successfully connected ${githubSuccess}`)
+            window.history.replaceState({}, "", window.location.pathname)
+        }
+        const githubError = params.get("github_error")
+        if (githubError) {
+            toast.error(`GitHub connection failed: ${decodeURIComponent(githubError)}`)
             window.history.replaceState({}, "", window.location.pathname)
         }
     }, [])
@@ -610,10 +651,25 @@ export const CredentialForm = ({ initialData }: CredentialsFormPage) => {
         return { postgresHost: "", postgresPort: 5432, postgresDatabase: "", postgresUser: "", postgresPassword: "", postgresSsl: "disable" }
     }, [initialData])
 
+    const githubDefaults = useMemo(() => {
+        if ((initialData?.type === CredentialType.GITHUB || initialData?.type === CredentialType.GITHUB_APP) && initialData.value) {
+            try {
+                const parsed = JSON.parse(initialData.value)
+                return {
+                    githubAccessToken: parsed.accessToken ?? "",
+                    githubBaseUrl: parsed.baseUrl ?? "",
+                }
+            } catch {
+                return { githubAccessToken: "", githubBaseUrl: "" }
+            }
+        }
+        return { githubAccessToken: "", githubBaseUrl: "" }
+    }, [initialData])
+
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema) as any,
         defaultValues: initialData
-            ? { ...initialData, gmailEmail: "", gmailAppPassword: "", ...whatsappDefaults, ...notionDefaults, ...razorpayDefaults, ...msg91Defaults, ...shiprocketDefaults, ...slackDefaults, ...zohoDefaults, ...hubspotDefaults, ...freshdeskDefaults, ...cashfreeDefaults, ...postgresDefaults }
+            ? { ...initialData, gmailEmail: "", gmailAppPassword: "", ...whatsappDefaults, ...notionDefaults, ...razorpayDefaults, ...msg91Defaults, ...shiprocketDefaults, ...slackDefaults, ...zohoDefaults, ...hubspotDefaults, ...freshdeskDefaults, ...cashfreeDefaults, ...postgresDefaults, ...githubDefaults }
             : {
                 name: "",
                 type: CredentialType.OPENAI,
@@ -653,6 +709,8 @@ export const CredentialForm = ({ initialData }: CredentialsFormPage) => {
                 postgresUser: "",
                 postgresPassword: "",
                 postgresSsl: "disable",
+                githubAccessToken: "",
+                githubBaseUrl: "",
             }
     })
 
@@ -673,14 +731,16 @@ export const CredentialForm = ({ initialData }: CredentialsFormPage) => {
     const isFreshdesk = watchType === CredentialType.FRESHDESK
     const isCashfree = watchType === CredentialType.CASHFREE
     const isPostgres = watchType === CredentialType.POSTGRES
+    const isGithubPAT = watchType === CredentialType.GITHUB
+    const isGithubApp = watchType === CredentialType.GITHUB_APP
     const watchSlackAuthType = form.watch("slackAuthType")
 
     const onSubmit = async (values: FormValues) => {
         let submitValues = { ...values }
 
-        // Google OAuth services: credential already saved by /api/auth/google/callback.
+        // Google and GitHub OAuth services: credential already saved by callback.
         // Only update the name here.
-        if (isGoogleService) {
+        if (isGoogleService || isGithubApp) {
             if (isEdit && initialData?.id) {
                 try {
                     await updateCredentialName.mutateAsync({
@@ -791,6 +851,13 @@ export const CredentialForm = ({ initialData }: CredentialsFormPage) => {
             })
         }
 
+        if (values.type === CredentialType.GITHUB) {
+            submitValues.value = JSON.stringify({
+                accessToken: values.githubAccessToken,
+                baseUrl: values.githubBaseUrl,
+            })
+        }
+
         // For Slack, encode based on auth type
         if (values.type === CredentialType.SLACK) {
             if (values.slackAuthType === "bot_token") {
@@ -806,7 +873,7 @@ export const CredentialForm = ({ initialData }: CredentialsFormPage) => {
             }
         }
 
-        const { gmailEmail, gmailAppPassword, whatsappAccessToken, whatsappPhoneNumberId, notionApiKey, razorpayKeyId, razorpayKeySecret, msg91AuthKey, shiprocketEmail, shiprocketPassword, zohoClientId, zohoClientSecret, zohoRefreshToken, zohoRegion, slackAuthType, slackBotToken, slackWebhookUrl, hubspotAccessToken, hubspotRefreshToken, hubspotExpiresAt, hubspotPortalId, hubspotHubId, freshdeskApiKey, freshdeskDomain, cashfreeClientId, cashfreeClientSecret, cashfreeEnvironment, cashfreePayoutClientId, cashfreePayoutClientSecret, postgresHost, postgresPort, postgresDatabase, postgresUser, postgresPassword, postgresSsl, ...payload } = submitValues
+        const { gmailEmail, gmailAppPassword, whatsappAccessToken, whatsappPhoneNumberId, notionApiKey, razorpayKeyId, razorpayKeySecret, msg91AuthKey, shiprocketEmail, shiprocketPassword, zohoClientId, zohoClientSecret, zohoRefreshToken, zohoRegion, slackAuthType, slackBotToken, slackWebhookUrl, hubspotAccessToken, hubspotRefreshToken, hubspotExpiresAt, hubspotPortalId, hubspotHubId, freshdeskApiKey, freshdeskDomain, cashfreeClientId, cashfreeClientSecret, cashfreeEnvironment, cashfreePayoutClientId, cashfreePayoutClientSecret, postgresHost, postgresPort, postgresDatabase, postgresUser, postgresPassword, postgresSsl, githubAccessToken, githubBaseUrl, ...payload } = submitValues
 
         if (isEdit && initialData?.id) {
             await updateCredential.mutate({
@@ -1687,6 +1754,48 @@ export const CredentialForm = ({ initialData }: CredentialsFormPage) => {
                                         )}
                                     />
                                 </>
+                            ) : isGithubPAT ? (
+                                <>
+                                    <FormField
+                                        control={form.control as any}
+                                        name="githubAccessToken"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>GitHub Personal Access Token (Classic or Fine-grained) <span className="text-red-500">*</span></FormLabel>
+                                                <FormControl>
+                                                    <Input type="password" placeholder="ghp_..." {...field} />
+                                                </FormControl>
+                                                <FormDescription>Token requires repo, workflow, read:org, and read:user scopes for full functionality.</FormDescription>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control as any}
+                                        name="githubBaseUrl"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>GitHub API Base URL (Optional)</FormLabel>
+                                                <FormControl>
+                                                    <Input type="text" placeholder="https://api.github.com" {...field} />
+                                                </FormControl>
+                                                <FormDescription>Leave blank for github.com. Change only if using GitHub Enterprise Server.</FormDescription>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </>
+                            ) : isGithubApp ? (
+                                <GithubConnectButton 
+                                    credentialName={form.watch("name")}
+                                    credentialType="GITHUB_APP"
+                                    isConnected={isGithubOAuth}
+                                    connectedUsername={connectedGithubUsername}
+                                    onDisconnect={() => {
+                                        setConnectedGithubUsername(undefined)
+                                        setIsGithubOAuth(false)
+                                    }}
+                                />
                             ) : (
                                 <FormField
                                     control={form.control}

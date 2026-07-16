@@ -1,11 +1,19 @@
-import { NonRetriableError } from "inngest"
-import type { NodeExecutor } from "@/features/executions/types"
+import { NonRetriableError, RetryAfterError } from "inngest"
+import type { NodeExecutor, WorkflowContext } from "@/features/executions/types"
+import { asBoolean, asNumber, asString } from "@/features/executions/types"
 import prisma from "@/lib/db"
 import { decrypt } from "@/lib/encryption"
 import { resolveTemplate } from "@/features/executions/lib/template-resolver"
 import { slackChannel } from "@/inngest/channels/slack"
-import { SlackOperation } from "@/generated/prisma"
+import { SlackOperation } from "@/features/executions/enums"
 import { mimeTypeToExt } from "@/lib/media-service"
+import {
+  mapCorsairError,
+  resolveTenantId,
+} from "@/lib/corsair"
+import { tryRunIntegration } from "@/features/integrations/runner"
+import { isSlackLegacyOnlyOp } from "@/features/integrations/adapters/slack/operations"
+import { NodeType } from "@/generated/prisma"
 
 /* ── Credential types ── */
 
@@ -141,35 +149,78 @@ async function slackFormDataRequest(
 /* ── Executor ── */
 
 export const slackExecutor: NodeExecutor<SlackData> = async ({
+  data,
   nodeId,
   context,
   step,
   publish,
   userId,
-}) => {
+  tenantId: tenantIdParam,
+}): Promise<WorkflowContext> => {
   await publish(slackChannel().status({ nodeId, status: "loading" }))
 
   // Step 1: Load config from DB
-  const config = await step.run(`slack-${nodeId}-load-config`, async () => {
-    return prisma.slackNode.findUnique({ where: { nodeId } })
-  })
+  // unknown: Node.data is free-form JSON from DB/editor
+  const config = (data ?? {}) as Record<string, unknown>
+  const credentialId = asString(config.credentialId)
+  const operation = asString(config.operation, "MESSAGE_SEND")
 
-  if (!config) {
+  if (Object.keys(config).length === 0) {
     await publish(slackChannel().status({ nodeId, status: "error" }))
     throw new NonRetriableError(
-      "Slack node not configured. Open settings to configure."
+      "Slack node not configured. Open settings to configure.",
     )
   }
 
-  // Step 2: Load and decrypt credential
+  // ── Corsair backbone (Option C) — skip for legacy-only ops ──
+  if (!isSlackLegacyOnlyOp(operation)) {
+    const tenantId =
+      tenantIdParam && tenantIdParam.trim() !== ""
+        ? tenantIdParam
+        : resolveTenantId({ userId })
+    try {
+      const corsairResult = await step.run(
+        `slack-${nodeId}-corsair`,
+        async () => {
+          return tryRunIntegration({
+            nodeType: NodeType.SLACK,
+            data: config,
+            context,
+            nodeId,
+            userId,
+            tenantId,
+          })
+        },
+      )
+      if (corsairResult) {
+        await publish(slackChannel().status({ nodeId, status: "success" }))
+        return corsairResult.context
+      }
+    } catch (error) {
+      // Legacy-only fallback: if Corsair rejects with legacy-only message, continue
+      const msg = error instanceof Error ? error.message : String(error)
+      if (!msg.includes("legacy path") && !msg.includes("not available on Corsair")) {
+        await publish(slackChannel().status({ nodeId, status: "error" }))
+        if (
+          error instanceof NonRetriableError ||
+          error instanceof RetryAfterError
+        ) {
+          throw error
+        }
+        mapCorsairError(error, "Slack")
+      }
+    }
+  }
+
+  // Step 2: Load and decrypt credential (legacy Cryptr path)
   const credential = await step.run(
     `slack-${nodeId}-load-credential`,
     async () => {
-      if (!config.credentialId) return null
+      if (!credentialId) return null
       return prisma.credential.findUnique({
-        where: { id: config.credentialId, userId },
+        where: { id: credentialId, userId },
       })
-    }
+    },
   )
 
   let creds: SlackCredential | null = null
@@ -186,7 +237,7 @@ export const slackExecutor: NodeExecutor<SlackData> = async ({
     }
   }
 
-  const isWebhookOp = config.operation === SlackOperation.MESSAGE_SEND_WEBHOOK
+  const isWebhookOp = operation === SlackOperation.MESSAGE_SEND_WEBHOOK
 
   if (!isWebhookOp && (!creds || creds.type !== "bot_token")) {
     await publish(slackChannel().status({ nodeId, status: "error" }))
@@ -199,35 +250,35 @@ export const slackExecutor: NodeExecutor<SlackData> = async ({
   let result: Record<string, unknown>
   try {
     result = await step.run(`slack-${nodeId}-execute`, async () => {
-      const channel = resolveTemplate(config.channel, context)
-      const message = resolveTemplate(config.message, context)
-      const threadTs = resolveTemplate(config.threadTs, context)
-      const messageTs = resolveTemplate(config.messageTs, context)
-      const channelName = resolveTemplate(config.channelName, context)
-      const channelTopic = resolveTemplate(config.channelTopic, context)
-      const channelPurpose = resolveTemplate(config.channelPurpose, context)
-      const slackUserId = resolveTemplate(config.userId, context)
-      const emoji = resolveTemplate(config.emoji, context)
-      const blockKit = resolveTemplate(config.blockKit, context)
-      const botName = resolveTemplate(config.botName, context)
-      const iconEmojiVal = resolveTemplate(config.iconEmoji, context)
-      const filenameVal = resolveTemplate(config.filename, context)
-      const fileTypeVal = resolveTemplate(config.fileType, context)
-      const titleVal = resolveTemplate(config.title, context)
-      const initialCommentVal = resolveTemplate(config.initialComment, context)
-      const emailVal = resolveTemplate(config.email, context)
-      const statusTextVal = resolveTemplate(config.statusText, context)
-      const statusEmojiVal = resolveTemplate(config.statusEmoji, context)
-      const statusExpirationVal = resolveTemplate(config.statusExpiration, context)
-      const sendAtVal = resolveTemplate(config.sendAt, context)
-      const fileIdVal = resolveTemplate(config.fileId, context)
-      const contentVal = resolveTemplate(config.content, context)
+      const channel = resolveTemplate(asString(config.channel), context)
+      const message = resolveTemplate(asString(config.message), context)
+      const threadTs = resolveTemplate(asString(config.threadTs), context)
+      const messageTs = resolveTemplate(asString(config.messageTs), context)
+      const channelName = resolveTemplate(asString(config.channelName), context)
+      const channelTopic = resolveTemplate(asString(config.channelTopic), context)
+      const channelPurpose = resolveTemplate(asString(config.channelPurpose), context)
+      const slackUserId = resolveTemplate(asString(config.userId), context)
+      const emoji = resolveTemplate(asString(config.emoji), context)
+      const blockKit = resolveTemplate(asString(config.blockKit), context)
+      const botName = resolveTemplate(asString(config.botName), context)
+      const iconEmojiVal = resolveTemplate(asString(config.iconEmoji), context)
+      const filenameVal = resolveTemplate(asString(config.filename), context)
+      const fileTypeVal = resolveTemplate(asString(config.fileType), context)
+      const titleVal = resolveTemplate(asString(config.title), context)
+      const initialCommentVal = resolveTemplate(asString(config.initialComment), context)
+      const emailVal = resolveTemplate(asString(config.email), context)
+      const statusTextVal = resolveTemplate(asString(config.statusText), context)
+      const statusEmojiVal = resolveTemplate(asString(config.statusEmoji), context)
+      const statusExpirationVal = resolveTemplate(asString(config.statusExpiration), context)
+      const sendAtVal = resolveTemplate(asString(config.sendAt), context)
+      const fileIdVal = resolveTemplate(asString(config.fileId), context)
+      const contentVal = resolveTemplate(asString(config.content), context)
 
       const token = creds?.type === "bot_token" ? creds.token : ""
 
       let apiResult: Record<string, unknown> = {}
 
-      switch (config.operation) {
+      switch (operation) {
         // ── Message Operations ──
 
         case SlackOperation.MESSAGE_SEND_WEBHOOK: {
@@ -381,10 +432,12 @@ export const slackExecutor: NodeExecutor<SlackData> = async ({
 
         case SlackOperation.CHANNEL_LIST: {
           const params = new URLSearchParams()
-          if (config.channelTypes)
-            params.set("types", config.channelTypes)
-          params.set("limit", String(config.limit || 100))
-          if (config.excludeArchived) params.set("exclude_archived", "true")
+          const channelTypes = asString(config.channelTypes)
+          if (channelTypes) params.set("types", channelTypes)
+          params.set("limit", String(asNumber(config.limit, 100)))
+          if (asBoolean(config.excludeArchived)) {
+            params.set("exclude_archived", "true")
+          }
           const data = await slackRequest(
             "GET",
             `conversations.list?${params.toString()}`,
@@ -725,14 +778,15 @@ export const slackExecutor: NodeExecutor<SlackData> = async ({
 
         default:
           throw new NonRetriableError(
-            `Unknown or unsupported Slack operation: ${config.operation}`
+            `Unknown or unsupported Slack operation: ${operation}`,
           )
       }
 
+      const variableName = asString(config.variableName, "slack")
       return {
         ...context,
-        [config.variableName || "slack"]: {
-          operation: config.operation,
+        [variableName]: {
+          operation,
           ...apiResult,
           timestamp: new Date().toISOString(),
         },

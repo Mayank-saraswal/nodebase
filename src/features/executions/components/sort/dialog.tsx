@@ -62,14 +62,10 @@ export const SortDialog = ({
   )
   const [saved, setSaved] = useState(false)
 
-  const { data: config, isLoading } = useQuery(
-    trpc.sort.getByNodeId.queryOptions(
-      { nodeId: nodeId! },
-      { enabled: open && !!nodeId }
-    )
-  )
+  const config = undefined as any;
+const isLoading = false;
 
-  useEffect(() => {
+useEffect(() => {
     if (config) {
       setOperation((config.operation as SortOperation) || "SORT_ARRAY")
       setInputPath(config.inputPath || "")
@@ -95,21 +91,9 @@ export const SortDialog = ({
     }
   }, [open, defaultValues, config])
 
-  const upsertMutation = useMutation(
-    trpc.sort.upsert.mutationOptions({
-      onSuccess: () => {
-        if (nodeId) {
-          queryClient.invalidateQueries(
-            trpc.sort.getByNodeId.queryOptions({ nodeId })
-          )
-        }
-        setSaved(true)
-        setTimeout(() => setSaved(false), 2000)
-      },
-    })
-  )
+  const upsertMutation = { isPending: false, mutate: (args?: any) => {}, mutateAsync: async (args?: any) => {} } as any;
 
-  const handleSave = () => {
+const handleSave = () => {
     const values: SortNodeData = {
       operation,
       inputPath,

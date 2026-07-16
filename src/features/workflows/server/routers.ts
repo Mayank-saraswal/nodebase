@@ -3,12 +3,13 @@ import prisma from "@/lib/db";
 import { generateSlug } from "random-word-slugs"
 import { z } from 'zod'
 import { PAGINATION } from "@/config/constants";
-import { NodeType } from "@/generated/prisma";
+import { NodeType, Prisma } from "@/generated/prisma"
 import { Node, Edge } from "@xyflow/react"
 
 import { inngest } from "@/inngest/client";
 import { sendWorkflowExecution } from "@/inngest/utils";
 import { checkExecutionLimit, incrementExecutionCount } from "@/lib/execution-gate";
+import { tenantIdForUser } from "@/lib/tenant";
 
 
 
@@ -39,10 +40,12 @@ export const workflowsRouter = createTRPCRouter({
             return workflow
         }),
     create: protectedProcedure.mutation(({ ctx }) => {
+        const tenantId = tenantIdForUser(ctx.auth.user.id)
         return prisma.workflow.create({
             data: {
                 name: generateSlug(3),
                 userId: ctx.auth.user.id,
+                tenantId,
                 nodes: {
                     create: {
                         type: NodeType.INITIAL,
@@ -98,7 +101,8 @@ export const workflowsRouter = createTRPCRouter({
                         x: z.number(),
                         y: z.number(),
                     }),
-                    data: z.record(z.string(), z.any().optional()),
+                    // unknown: free-form node config JSON from the editor (validated per-node later)
+                    data: z.record(z.string(), z.unknown().optional()),
 
                 })
             ),
@@ -133,13 +137,14 @@ export const workflowsRouter = createTRPCRouter({
                     data: nodes.map((node) => ({
                         id: node.id,
                         workflowId: id,
-                        name: node.type || "unkonwn",
-                        type: node.type as NodeType,
+                        name: node.type || "unknown",
+                        type: (node.type as NodeType) || NodeType.INITIAL,
                         position: node.position,
-                        data: node.data
+                        // Prisma InputJsonValue: free-form editor JSON
+                        data: (node.data ?? {}) as Prisma.InputJsonValue,
                     })),
                 });
-                //create connetions
+                //create connections
                 await tx.connection.createMany({
                     data: edges.map((edge) => ({
 
@@ -151,14 +156,17 @@ export const workflowsRouter = createTRPCRouter({
                     })),
                 })
 
-                //updating workflows updateAt timestamps
+                // Touch updatedAt + ensure tenantId always set (self-heal pre-migration rows)
                 await tx.workflow.update({
                     where: {
                         id,
-
                     },
                     data: {
-                        updatedAt: new Date()
+                        updatedAt: new Date(),
+                        tenantId:
+                          workflow.tenantId && workflow.tenantId.trim() !== ""
+                            ? workflow.tenantId
+                            : tenantIdForUser(ctx.auth.user.id),
                     }
                 })
                 return workflow

@@ -20,8 +20,7 @@ async function getExecutorRegistry() {
   return executorRegistry
 }
 
-export const loopExecutor: NodeExecutor = async ({
-  nodeId,
+export const loopExecutor: NodeExecutor = async ({ data, nodeId,
   context,
   step,
   publish,
@@ -32,11 +31,9 @@ export const loopExecutor: NodeExecutor = async ({
   await publish(loopChannel().status({ nodeId, status: "loading" }))
 
   // Load Loop config
-  const config = await step.run(`loop-${nodeId}-load-config`, () =>
-    prisma.loopNode.findUnique({ where: { nodeId } })
-  )
+  const config = data as any;
 
-  if (!config) {
+if (!config) {
     await publish(loopChannel().status({ nodeId, status: "error" }))
     throw new NonRetriableError("Loop node configuration not found")
   }
@@ -131,6 +128,7 @@ export const loopExecutor: NodeExecutor = async ({
         const output = await executor({
           nodeId: downstreamNode.id,
           data: (downstreamNode.data ?? {}) as Record<string, unknown>,
+          credentialId: ((downstreamNode.data ?? {}) as any).credentialId || null,
           context: itemContext,
           step: loopStep,
           publish,

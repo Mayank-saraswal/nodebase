@@ -9,6 +9,10 @@ import { scheduleTriggerExecutor } from "@/features/triggers/components/schedule
 import { discordExecutor } from "../components/discord/executor";
 import { slackExecutor } from "../components/slack/executor";
 import { aiExecutor } from "../components/ai/executor";
+import { openAiExecutor } from "../components/openai/executor";
+import { geminiExecutor } from "../components/gemini/executor";
+import { deepseekExecutor } from "../components/deepseek/executor";
+import { perplexityExecutor } from "../components/perplexity/executor";
 import { telegramExecutor } from "../components/telegram/executor";
 import { xExecutor } from "../components/x/executor";
 import { workdayExecutor } from "../components/workday/executor";
@@ -42,7 +46,8 @@ import { postgresExecutor } from "../components/postgres/executor";
 import { githubExecutor } from "../components/github/executor";
 import { githubTriggerExecutor } from "@/features/triggers/components/github-trigger/executor";
 
-export const executorRegistry: Record<NodeType, NodeExecutor> = {
+// Cast: specialized NodeExecutor<TData> is assignable at runtime; TS variance is invariant on params
+export const executorRegistry = {
     [NodeType.MANUAL_TRIGGER]: manualTriggerExecutor,
     [NodeType.HTTP_REQUEST]: httpRequestExecutor,
     [NodeType.INITIAL]: manualTriggerExecutor,
@@ -50,14 +55,14 @@ export const executorRegistry: Record<NodeType, NodeExecutor> = {
     [NodeType.STRIPE_TRIGGER]: stripeTriggerExecutor,
     [NodeType.WEBHOOK_TRIGGER]: webhookTriggerExecutor,
     [NodeType.SCHEDULE_TRIGGER]: scheduleTriggerExecutor,
-    [NodeType.GEMINI]: aiExecutor,
+    [NodeType.GEMINI]: geminiExecutor,
     [NodeType.ANTHROPIC]: aiExecutor,
-    [NodeType.OPENAI]: aiExecutor,
+    [NodeType.OPENAI]: openAiExecutor,
     [NodeType.XAI]: aiExecutor,
     [NodeType.DISCORD]: discordExecutor,
     [NodeType.SLACK]: slackExecutor,
-    [NodeType.PERPLEXITY]: aiExecutor,
-    [NodeType.DEEPSEEK]: aiExecutor,
+    [NodeType.PERPLEXITY]: perplexityExecutor,
+    [NodeType.DEEPSEEK]: deepseekExecutor,
     [NodeType.GROQ]: aiExecutor,
     [NodeType.TELEGRAM]: telegramExecutor,
     [NodeType.X]: xExecutor,
@@ -92,7 +97,7 @@ export const executorRegistry: Record<NodeType, NodeExecutor> = {
     [NodeType.POSTGRES]: postgresExecutor,
     [NodeType.GITHUB]: githubExecutor,
     [NodeType.GITHUB_TRIGGER]: githubTriggerExecutor,
-}
+} as Record<NodeType, NodeExecutor>
 
 export const getExecutor = (type: NodeType): NodeExecutor => {
     const executor = executorRegistry[type]
@@ -100,6 +105,5 @@ export const getExecutor = (type: NodeType): NodeExecutor => {
         throw new Error(`No executor found for node type:${type}`)
     }
 
-    return executor;
-
-};
+    return executor
+}

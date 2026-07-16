@@ -27,8 +27,7 @@ import {
  * mergeParallelResults(), the Merge node can focus on applying
  * the user's chosen strategy to re-structure the data.
  */
-export const mergeExecutor: NodeExecutor = async ({
-  nodeId,
+export const mergeExecutor: NodeExecutor = async ({ data, nodeId,
   context,
   step,
   publish,
@@ -40,13 +39,9 @@ export const mergeExecutor: NodeExecutor = async ({
     })
   )
 
-  const config = await step.run(`merge-${nodeId}-load-config`, async () => {
-    return prisma.mergeNode.findUnique({
-      where: { nodeId },
-    })
-  })
+  const config = data as any;
 
-  if (!config) {
+if (!config) {
     await publish(
       mergeChannel().status({
         nodeId,
@@ -85,14 +80,14 @@ export const mergeExecutor: NodeExecutor = async ({
     // User specified all branch keys explicitly (for 3+ branch modes)
     branchValues = rawBranchKeys
       .split(",")
-      .map((k) => k.trim())
+      .map((k: string) => k.trim())
       .filter(Boolean)
-      .map((k) => ctx[k])
-      .filter((v) => v !== undefined)
+      .map((k: string) => ctx[k])
+      .filter((v: any) => v !== undefined)
   } else if (key1 || key2) {
     // User specified individual branch keys (for 2-branch modes)
     branchValues = [key1 ? ctx[key1] : undefined, key2 ? ctx[key2] : undefined]
-      .filter((v) => v !== undefined)
+      .filter((v: any) => v !== undefined)
   } else {
     // Fallback: collect all non-internal context values.
     // Less precise but maintains backward compatibility.

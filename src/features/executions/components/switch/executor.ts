@@ -13,8 +13,7 @@ interface SwitchCase {
   conditionsJson: string
 }
 
-export const switchExecutor: NodeExecutor = async ({
-  nodeId,
+export const switchExecutor: NodeExecutor = async ({ data, nodeId,
   context,
   step,
   publish,
@@ -24,11 +23,9 @@ export const switchExecutor: NodeExecutor = async ({
   await publish(switchChannel().status({ nodeId, status: "loading" }))
 
   // Step 1: Load config
-  const config = await step.run(`switch-${nodeId}-load-config`, async () =>
-    prisma.switchNode.findUnique({ where: { nodeId } })
-  )
+  const config = data as any;
 
-  if (!config) {
+if (!config) {
     await publish(switchChannel().status({ nodeId, status: "error" }))
     throw new NonRetriableError(
       "Switch node not configured. Open settings and add at least one case."

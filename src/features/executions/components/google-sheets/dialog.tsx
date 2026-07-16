@@ -36,11 +36,16 @@ type GoogleSheetsOp =
   | "SEARCH_ROWS"
   | "GET_SHEET_INFO"
   | "APPEND_ROW"
+  | "APPEND_OR_UPDATE_ROW"
   | "UPDATE_ROW"
   | "UPDATE_ROWS_BY_QUERY"
   | "DELETE_ROW"
   | "CLEAR_RANGE"
   | "CREATE_SHEET"
+  | "DELETE_SHEET"
+  | "CREATE_SPREADSHEET"
+  | "DELETE_SPREADSHEET"
+  | "LIST_SPREADSHEETS"
 
 export interface GoogleSheetsFormValues {
   credentialId?: string
@@ -61,6 +66,8 @@ export interface GoogleSheetsFormValues {
   updateValues?: string
   maxResults?: number
   includeEmptyRows?: boolean
+  pageToken?: string
+  range?: string
 }
 
 interface GoogleSheetsDialogProps {
@@ -75,6 +82,7 @@ interface GoogleSheetsDialogProps {
 const OUTPUT_HINTS: Record<string, string[]> = {
   READ_ROWS: ["rows", "count", "rows.0.ColumnName", "headers"],
   APPEND_ROW: ["appendedRow", "updatedRange"],
+  APPEND_OR_UPDATE_ROW: ["result", "matchColumn", "matchValue"],
   UPDATE_ROW: ["updatedRow", "range"],
   UPDATE_ROWS_BY_QUERY: ["updatedCount", "updatedRows"],
   DELETE_ROW: ["deletedRow", "spreadsheetId"],
@@ -82,8 +90,18 @@ const OUTPUT_HINTS: Record<string, string[]> = {
   SEARCH_ROWS: ["rows", "count", "firstRow", "firstRowNumber"],
   CLEAR_RANGE: ["clearedRange"],
   CREATE_SHEET: ["sheetName", "sheetId"],
+  DELETE_SHEET: ["sheetId", "sheetName", "success"],
   GET_SHEET_INFO: ["title", "sheets", "sheetCount"],
+  CREATE_SPREADSHEET: ["spreadsheetId", "title", "spreadsheetUrl"],
+  DELETE_SPREADSHEET: ["spreadsheetId", "deleted"],
+  LIST_SPREADSHEETS: ["spreadsheets", "count", "nextPageToken"],
 }
+
+/** Ops that do not need an existing spreadsheetId */
+const NO_SPREADSHEET_ID: GoogleSheetsOp[] = [
+  "CREATE_SPREADSHEET",
+  "LIST_SPREADSHEETS",
+]
 
 export const GoogleSheetsDialog = ({
   open,
@@ -117,81 +135,51 @@ export const GoogleSheetsDialog = ({
   const [updateValues, setUpdateValues] = useState(defaultValues.updateValues || "")
   const [maxResults, setMaxResults] = useState(defaultValues.maxResults ?? 100)
   const [includeEmptyRows, setIncludeEmptyRows] = useState(defaultValues.includeEmptyRows ?? false)
+  const [pageToken, setPageToken] = useState(defaultValues.pageToken || "")
+  const [range, setRange] = useState(defaultValues.range || "A:Z")
   const [saved, setSaved] = useState(false)
 
   const { data: credentials, isLoading: isLoadingCredentials } =
     useCredentialsByType(CredentialType.GOOGLE_SHEETS)
 
-  const { data: config, isLoading } = useQuery(
-    trpc.googleSheets.getByNodeId.queryOptions(
-      { nodeId: nodeId! },
-      { enabled: open && !!nodeId }
-    )
-  )
-
-  // Pre-fill from DB config when loaded
-  useEffect(() => {
-    if (config) {
-      setCredentialId(config.credentialId || "")
-      setOperation(config.operation as GoogleSheetsOp)
-      setVariableName(config.variableName || "googleSheets")
-      setSpreadsheetId(config.spreadsheetId)
-      setSheetName(config.sheetName)
-      setHeaderRow(config.headerRow)
-      setRowNumber(config.rowNumber)
-      setRowValues(config.rowValues)
-      setSearchColumn(config.searchColumn)
-      setSearchValue(config.searchValue)
-      setClearRange(config.clearRange)
-      setNewSheetName(config.newSheetName)
-      setValueInputOption(config.valueInputOption)
-      setMatchColumn(config.matchColumn)
-      setMatchValue(config.matchValue)
-      setUpdateValues(config.updateValues)
-      setMaxResults(config.maxResults)
-      setIncludeEmptyRows(config.includeEmptyRows)
-    }
-  }, [config])
+  const isLoading = false
 
   // Reset when dialog opens with defaultValues
   useEffect(() => {
-    if (open && !config) {
-      setCredentialId(defaultValues.credentialId || "")
-      setOperation((defaultValues.operation as GoogleSheetsOp) || "APPEND_ROW")
-      setVariableName(defaultValues.variableName || "googleSheets")
-      setSpreadsheetId(defaultValues.spreadsheetId || "")
-      setSheetName(defaultValues.sheetName || "Sheet1")
-      setHeaderRow(defaultValues.headerRow ?? true)
-      setRowNumber(defaultValues.rowNumber || "")
-      setRowValues(defaultValues.rowValues || "")
-      setSearchColumn(defaultValues.searchColumn || "")
-      setSearchValue(defaultValues.searchValue || "")
-      setClearRange(defaultValues.clearRange || "")
-      setNewSheetName(defaultValues.newSheetName || "")
-      setValueInputOption(defaultValues.valueInputOption || "USER_ENTERED")
-      setMatchColumn(defaultValues.matchColumn || "")
-      setMatchValue(defaultValues.matchValue || "")
-      setUpdateValues(defaultValues.updateValues || "")
-      setMaxResults(defaultValues.maxResults ?? 100)
-      setIncludeEmptyRows(defaultValues.includeEmptyRows ?? false)
-    }
-  }, [open, defaultValues, config])
+    if (!open) return
+    setCredentialId(defaultValues.credentialId || "")
+    setOperation((defaultValues.operation as GoogleSheetsOp) || "APPEND_ROW")
+    setVariableName(defaultValues.variableName || "googleSheets")
+    setSpreadsheetId(defaultValues.spreadsheetId || "")
+    setSheetName(defaultValues.sheetName || "Sheet1")
+    setHeaderRow(defaultValues.headerRow ?? true)
+    setRowNumber(defaultValues.rowNumber || "")
+    setRowValues(defaultValues.rowValues || "")
+    setSearchColumn(defaultValues.searchColumn || "")
+    setSearchValue(defaultValues.searchValue || "")
+    setClearRange(defaultValues.clearRange || "")
+    setNewSheetName(defaultValues.newSheetName || "")
+    setValueInputOption(defaultValues.valueInputOption || "USER_ENTERED")
+    setMatchColumn(defaultValues.matchColumn || "")
+    setMatchValue(defaultValues.matchValue || "")
+    setUpdateValues(defaultValues.updateValues || "")
+    setMaxResults(defaultValues.maxResults ?? 100)
+    setIncludeEmptyRows(defaultValues.includeEmptyRows ?? false)
+    setPageToken(defaultValues.pageToken || "")
+    setRange(defaultValues.range || "A:Z")
+  }, [open, defaultValues])
 
-  const upsertMutation = useMutation(
-    trpc.googleSheets.upsert.mutationOptions({
-      onSuccess: () => {
-        if (nodeId) {
-          queryClient.invalidateQueries(
-            trpc.googleSheets.getByNodeId.queryOptions({ nodeId })
-          )
-        }
-        setSaved(true)
-        setTimeout(() => setSaved(false), 2000)
-      },
-    })
-  )
+  const upsertMutation = {
+    isPending: false,
+    mutate: (_args?: Record<string, unknown>) => {
+      /* parent onSubmit persists */
+    },
+  }
 
-  const isValid = !!credentialId.trim() && !!spreadsheetId.trim()
+  const needsSpreadsheetId = !NO_SPREADSHEET_ID.includes(operation)
+  const isValid =
+    !!credentialId.trim() &&
+    (!needsSpreadsheetId || !!spreadsheetId.trim())
 
   const handleSave = () => {
     if (!isValid) return
@@ -215,6 +203,8 @@ export const GoogleSheetsDialog = ({
       updateValues,
       maxResults,
       includeEmptyRows,
+      pageToken,
+      range,
     }
 
     onSubmit(values)
@@ -223,24 +213,7 @@ export const GoogleSheetsDialog = ({
       upsertMutation.mutate({
         workflowId,
         nodeId,
-        credentialId,
-        operation,
-        variableName,
-        spreadsheetId,
-        sheetName,
-        headerRow,
-        rowNumber,
-        rowValues,
-        searchColumn,
-        searchValue,
-        clearRange,
-        newSheetName,
-        valueInputOption,
-        matchColumn,
-        matchValue,
-        updateValues,
-        maxResults,
-        includeEmptyRows,
+        ...values,
       })
     }
   }
@@ -312,27 +285,7 @@ export const GoogleSheetsDialog = ({
 
             <Separator />
 
-            {/* 3. Spreadsheet ID */}
-            <div className="space-y-2">
-              <Label>Spreadsheet ID *</Label>
-              <Input
-                placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"
-                value={spreadsheetId}
-                onChange={(e) => setSpreadsheetId(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                {"Found in Google Sheets URL: .../spreadsheets/d/{ID}/edit"}
-              </p>
-              {!spreadsheetId.trim() && (
-                <p className="text-xs text-destructive">
-                  Spreadsheet ID is required
-                </p>
-              )}
-            </div>
-
-            <Separator />
-
-            {/* 4. Operation (grouped) */}
+            {/* 3. Operation (grouped) */}
             <div className="space-y-2">
               <Label>Operation</Label>
               <Select
@@ -349,18 +302,23 @@ export const GoogleSheetsDialog = ({
                     <SelectItem value="GET_ROW_BY_NUMBER">Get Row by Number</SelectItem>
                     <SelectItem value="SEARCH_ROWS">Search Rows</SelectItem>
                     <SelectItem value="GET_SHEET_INFO">Get Sheet Info</SelectItem>
+                    <SelectItem value="LIST_SPREADSHEETS">List Spreadsheets</SelectItem>
                   </SelectGroup>
                   <SelectGroup>
                     <SelectLabel>Write</SelectLabel>
                     <SelectItem value="APPEND_ROW">Append Row</SelectItem>
+                    <SelectItem value="APPEND_OR_UPDATE_ROW">Append or Update Row</SelectItem>
                     <SelectItem value="UPDATE_ROW">Update Row</SelectItem>
                     <SelectItem value="UPDATE_ROWS_BY_QUERY">Update Rows by Query</SelectItem>
                     <SelectItem value="DELETE_ROW">Delete Row</SelectItem>
                     <SelectItem value="CLEAR_RANGE">Clear Range</SelectItem>
                   </SelectGroup>
                   <SelectGroup>
-                    <SelectLabel>Manage</SelectLabel>
-                    <SelectItem value="CREATE_SHEET">Create Sheet</SelectItem>
+                    <SelectLabel>Sheets &amp; Spreadsheets</SelectLabel>
+                    <SelectItem value="CREATE_SHEET">Create Sheet Tab</SelectItem>
+                    <SelectItem value="DELETE_SHEET">Delete Sheet Tab</SelectItem>
+                    <SelectItem value="CREATE_SPREADSHEET">Create Spreadsheet</SelectItem>
+                    <SelectItem value="DELETE_SPREADSHEET">Delete Spreadsheet</SelectItem>
                   </SelectGroup>
                 </SelectContent>
               </Select>
@@ -368,7 +326,137 @@ export const GoogleSheetsDialog = ({
 
             <Separator />
 
+            {/* Spreadsheet ID (hidden for create/list spreadsheet) */}
+            {needsSpreadsheetId && (
+              <>
+                <div className="space-y-2">
+                  <Label>Spreadsheet ID *</Label>
+                  <Input
+                    placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"
+                    value={spreadsheetId}
+                    onChange={(e) => setSpreadsheetId(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {"Found in Google Sheets URL: .../spreadsheets/d/{ID}/edit"}
+                  </p>
+                  {!spreadsheetId.trim() && (
+                    <p className="text-xs text-destructive">
+                      Spreadsheet ID is required
+                    </p>
+                  )}
+                </div>
+                <Separator />
+              </>
+            )}
+
             {/* ── DYNAMIC FIELDS per operation ── */}
+
+            {/* APPEND_OR_UPDATE_ROW */}
+            {operation === "APPEND_OR_UPDATE_ROW" && (
+              <>
+                <div className="space-y-2">
+                  <Label>Sheet Name</Label>
+                  <Input
+                    placeholder="Sheet1"
+                    value={sheetName}
+                    onChange={(e) => setSheetName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Match Column *</Label>
+                  <Input
+                    placeholder="Email"
+                    value={matchColumn}
+                    onChange={(e) => setMatchColumn(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Match Value *</Label>
+                  <Input
+                    placeholder="{{trigger.email}}"
+                    value={matchValue}
+                    onChange={(e) => setMatchValue(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Row Values *</Label>
+                  <Textarea
+                    className="min-h-[100px] font-mono"
+                    placeholder={'{"Name":"Ada","Email":"a@x.com"}'}
+                    value={rowValues}
+                    onChange={(e) => setRowValues(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
+
+            {/* DELETE_SHEET */}
+            {operation === "DELETE_SHEET" && (
+              <div className="space-y-2">
+                <Label>Sheet Name to Delete *</Label>
+                <Input
+                  placeholder="Sheet1"
+                  value={sheetName}
+                  onChange={(e) => setSheetName(e.target.value)}
+                />
+                <p className="text-xs text-destructive">
+                  Deletes the sheet tab by name (destructive).
+                </p>
+              </div>
+            )}
+
+            {/* CREATE_SPREADSHEET */}
+            {operation === "CREATE_SPREADSHEET" && (
+              <div className="space-y-2">
+                <Label>Spreadsheet Title *</Label>
+                <Input
+                  placeholder="New Spreadsheet"
+                  value={newSheetName}
+                  onChange={(e) => setNewSheetName(e.target.value)}
+                />
+              </div>
+            )}
+
+            {/* DELETE_SPREADSHEET */}
+            {operation === "DELETE_SPREADSHEET" && (
+              <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3">
+                <p className="text-xs text-destructive">
+                  Permanently deletes the spreadsheet identified by Spreadsheet ID.
+                </p>
+              </div>
+            )}
+
+            {/* LIST_SPREADSHEETS */}
+            {operation === "LIST_SPREADSHEETS" && (
+              <>
+                <div className="space-y-2">
+                  <Label>Search Query</Label>
+                  <Input
+                    placeholder="name contains 'Invoice'"
+                    value={searchValue}
+                    onChange={(e) => setSearchValue(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Max Results</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={maxResults}
+                    onChange={(e) => setMaxResults(parseInt(e.target.value) || 50)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Page Token</Label>
+                  <Input
+                    placeholder="{{googleSheets.nextPageToken}}"
+                    value={pageToken}
+                    onChange={(e) => setPageToken(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
 
             {/* READ_ROWS */}
             {operation === "READ_ROWS" && (

@@ -1,11 +1,19 @@
 import crypto from "crypto"
-import { NonRetriableError } from "inngest"
-import type { NodeExecutor } from "@/features/executions/types"
+import { NonRetriableError, RetryAfterError } from "inngest"
+import type { NodeExecutor, WorkflowContext } from "@/features/executions/types"
+import { asString } from "@/features/executions/types"
 import prisma from "@/lib/db"
 import { decrypt } from "@/lib/encryption"
 import { resolveTemplate } from "@/features/executions/lib/template-resolver"
 import { razorpayChannel } from "@/inngest/channels/razorpay"
-import { RazorpayOperation } from "@/generated/prisma"
+import { RazorpayOperation } from "@/features/executions/enums"
+import {
+  mapCorsairError,
+  resolveTenantId,
+} from "@/lib/corsair"
+import { tryRunIntegration } from "@/features/integrations/runner"
+import { isRazorpayCorsairOp } from "@/features/integrations/adapters/razorpay/operations"
+import { NodeType } from "@/generated/prisma"
 
 interface RazorpayCredential {
   keyId: string
@@ -61,48 +69,88 @@ function parseNotes(notesStr: string): Record<string, string> | undefined {
 }
 
 export const razorpayExecutor: NodeExecutor<RazorpayData> = async ({
+  data,
   nodeId,
   context,
   step,
   publish,
   userId,
-}) => {
+  tenantId: tenantIdParam,
+}): Promise<WorkflowContext> => {
   await publish(
     razorpayChannel().status({
       nodeId,
       status: "loading",
-    })
+    }),
   )
 
-  // Step 1: Load config
-  const config = await step.run(`razorpay-${nodeId}-load-config`, async () => {
-    return prisma.razorpayNode.findUnique({ where: { nodeId } })
-  })
+  // unknown: Node.data JSON boundary
+  const config = (data ?? {}) as Record<string, unknown>
+  const operation = asString(config.operation, "ORDER_CREATE")
 
-  if (!config) {
+  if (Object.keys(config).length === 0) {
     await publish(
       razorpayChannel().status({
         nodeId,
         status: "error",
-      })
+      }),
     )
     throw new NonRetriableError(
-      "Razorpay node not configured. Open settings to configure."
+      "Razorpay node not configured. Open settings to configure.",
     )
   }
 
-  // Step 2: Load and decrypt credential
+  // ── Corsair multi-tenant path for package-backed ops ──
+  if (isRazorpayCorsairOp(operation) && userId) {
+    const tenantId =
+      tenantIdParam && tenantIdParam.trim() !== ""
+        ? tenantIdParam
+        : resolveTenantId({ userId })
+    try {
+      const corsairResult = await step.run(
+        `razorpay-${nodeId}-corsair`,
+        async () => {
+          return tryRunIntegration({
+            nodeType: NodeType.RAZORPAY,
+            data: config,
+            context,
+            nodeId,
+            userId,
+            tenantId,
+          })
+        },
+      )
+      if (corsairResult) {
+        await publish(
+          razorpayChannel().status({ nodeId, status: "success" }),
+        )
+        return corsairResult.context
+      }
+    } catch (error) {
+      await publish(razorpayChannel().status({ nodeId, status: "error" }))
+      if (
+        error instanceof NonRetriableError ||
+        error instanceof RetryAfterError
+      ) {
+        throw error
+      }
+      mapCorsairError(error, "Razorpay")
+    }
+  }
+
+  // ── Legacy path: direct REST + credentialId ──
   const credential = await step.run(
     `razorpay-${nodeId}-load-credential`,
     async () => {
-      if (!config.credentialId) return null
+      const credentialId = asString(config.credentialId)
+      if (!credentialId) return null
       return prisma.credential.findUnique({
         where: {
-          id: config.credentialId,
+          id: credentialId,
           userId,
         },
       })
-    }
+    },
   )
 
   if (!credential) {
@@ -149,51 +197,53 @@ export const razorpayExecutor: NodeExecutor<RazorpayData> = async ({
   let result: Record<string, unknown>
   try {
     result = await step.run(`razorpay-${nodeId}-execute`, async () => {
-      // Resolve all template variables
-      const amount = resolveTemplate(config.amount, context)
-      const currency = resolveTemplate(config.currency, context) || "INR"
-      const description = resolveTemplate(config.description, context)
-      const receipt = resolveTemplate(config.receipt, context)
-      const notes = resolveTemplate(config.notes, context)
-      const orderId = resolveTemplate(config.orderId, context)
-      const paymentId = resolveTemplate(config.paymentId, context)
-      const captureAmount = resolveTemplate(config.captureAmount, context)
-      const refundAmount = resolveTemplate(config.refundAmount, context)
-      const refundId = resolveTemplate(config.refundId, context)
-      const customerId = resolveTemplate(config.customerId, context)
-      const customerName = resolveTemplate(config.customerName, context)
-      const customerEmail = resolveTemplate(config.customerEmail, context)
-      const customerContact = resolveTemplate(config.customerContact, context)
-      const planId = resolveTemplate(config.planId, context)
-      const totalCount = resolveTemplate(config.totalCount, context)
-      const quantity = resolveTemplate(config.quantity, context)
-      const startAt = resolveTemplate(config.startAt, context)
-      const subscriptionId = resolveTemplate(config.subscriptionId, context)
-      const invoiceType = resolveTemplate(config.invoiceType, context) || "invoice"
-      const lineItems = resolveTemplate(config.lineItems, context)
-      const expireBy = resolveTemplate(config.expireBy, context)
-      const invoiceId = resolveTemplate(config.invoiceId, context)
-      const paymentLinkId = resolveTemplate(config.paymentLinkId, context)
-      const referenceId = resolveTemplate(config.referenceId, context)
-      const callbackUrl = resolveTemplate(config.callbackUrl, context)
-      const callbackMethod = resolveTemplate(config.callbackMethod, context)
-      const accountNumber = resolveTemplate(config.accountNumber, context)
-      const fundAccountId = resolveTemplate(config.fundAccountId, context)
-      const payoutMode = resolveTemplate(config.payoutMode, context)
-      const payoutPurpose = resolveTemplate(config.payoutPurpose, context) || "payout"
-      const narration = resolveTemplate(config.narration, context)
-      const payoutId = resolveTemplate(config.payoutId, context)
-      const signature = resolveTemplate(config.signature, context)
-      const countParam = resolveTemplate(config.count, context)
-      const skipParam = resolveTemplate(config.skip, context)
-      const fromDate = resolveTemplate(config.fromDate, context)
-      const toDate = resolveTemplate(config.toDate, context)
-      const authorized = resolveTemplate(config.authorized, context)
-      const refundSpeed = resolveTemplate(config.refundSpeed, context) || "normal"
+      // Resolve all template variables (config is JSON boundary → asString)
+      const r = (key: string, fallback = "") =>
+        resolveTemplate(asString(config[key], fallback), context)
+      const amount = r("amount")
+      const currency = r("currency", "INR") || "INR"
+      const description = r("description")
+      const receipt = r("receipt")
+      const notes = r("notes")
+      const orderId = r("orderId")
+      const paymentId = r("paymentId")
+      const captureAmount = r("captureAmount")
+      const refundAmount = r("refundAmount")
+      const refundId = r("refundId")
+      const customerId = r("customerId")
+      const customerName = r("customerName")
+      const customerEmail = r("customerEmail")
+      const customerContact = r("customerContact")
+      const planId = r("planId")
+      const totalCount = r("totalCount")
+      const quantity = r("quantity")
+      const startAt = r("startAt")
+      const subscriptionId = r("subscriptionId")
+      const invoiceType = r("invoiceType", "invoice") || "invoice"
+      const lineItems = r("lineItems")
+      const expireBy = r("expireBy")
+      const invoiceId = r("invoiceId")
+      const paymentLinkId = r("paymentLinkId")
+      const referenceId = r("referenceId")
+      const callbackUrl = r("callbackUrl")
+      const callbackMethod = r("callbackMethod")
+      const accountNumber = r("accountNumber")
+      const fundAccountId = r("fundAccountId")
+      const payoutMode = r("payoutMode")
+      const payoutPurpose = r("payoutPurpose", "payout") || "payout"
+      const narration = r("narration")
+      const payoutId = r("payoutId")
+      const signature = r("signature")
+      const countParam = r("count")
+      const skipParam = r("skip")
+      const fromDate = r("fromDate")
+      const toDate = r("toDate")
+      const authorized = r("authorized")
+      const refundSpeed = r("refundSpeed", "normal") || "normal"
 
       let outputObject: Record<string, unknown>
 
-      switch (config.operation) {
+      switch (operation) {
         // ═══════════════════ ORDERS ═══════════════════
 
         case RazorpayOperation.ORDER_CREATE: {
@@ -815,21 +865,24 @@ export const razorpayExecutor: NodeExecutor<RazorpayData> = async ({
 
         default:
           throw new NonRetriableError(
-            `Unknown Razorpay operation: ${config.operation}`
+            `Unknown Razorpay operation: ${operation}`,
           )
       }
 
-      return {
+      const variableName: string =
+        asString(config.variableName, "razorpay").trim() || "razorpay"
+      const out: WorkflowContext = {
         ...context,
-        [config.variableName || "razorpay"]: outputObject,
+        [variableName]: outputObject,
       }
+      return out
     })
   } catch (error) {
     await publish(
       razorpayChannel().status({
         nodeId,
         status: "error",
-      })
+      }),
     )
     throw error
   }
@@ -838,8 +891,9 @@ export const razorpayExecutor: NodeExecutor<RazorpayData> = async ({
     razorpayChannel().status({
       nodeId,
       status: "success",
-    })
+    }),
   )
 
-  return result as Record<string, unknown>
+  // step.run returns the context object from the legacy switch
+  return result as WorkflowContext
 }

@@ -25,7 +25,8 @@ import {
 import { useTRPC } from "@/trpc/client"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useCredentialsByType } from "@/features/credentials/hooks/use-credentials"
-import { CredentialType, HubspotOperation } from "@/generated/prisma"
+import { CredentialType } from "@/generated/prisma"
+import { HubspotOperation } from "@/features/executions/enums"
 import { CheckIcon, Loader2Icon } from "lucide-react"
 import Link from "next/link"
 import { Separator } from "@/components/ui/separator"
@@ -117,6 +118,38 @@ interface HubspotDialogProps {
   workflowId?: string
 }
 
+/** Ops backed by @corsair-dev/hubspot when CORSAIR_PLUGIN_HUBSPOT is on */
+const CORSAIR_OPS = new Set<string>([
+  "CREATE_CONTACT",
+  "GET_CONTACT",
+  "UPDATE_CONTACT",
+  "DELETE_CONTACT",
+  "SEARCH_CONTACTS",
+  "UPSERT_CONTACT",
+  "CREATE_COMPANY",
+  "GET_COMPANY",
+  "UPDATE_COMPANY",
+  "DELETE_COMPANY",
+  "SEARCH_COMPANIES",
+  "CREATE_DEAL",
+  "GET_DEAL",
+  "UPDATE_DEAL",
+  "DELETE_DEAL",
+  "SEARCH_DEALS",
+  "UPDATE_DEAL_STAGE",
+  "CREATE_TICKET",
+  "GET_TICKET",
+  "UPDATE_TICKET",
+  "DELETE_TICKET",
+  "SEARCH_TICKETS",
+  "CREATE_NOTE",
+  "CREATE_TASK",
+  "CREATE_CALL",
+  "CREATE_EMAIL_LOG",
+  "ADD_CONTACT_TO_LIST",
+  "REMOVE_CONTACT_FROM_LIST",
+])
+
 const OP_GROUPS: Array<{ label: string; ops: HubspotOperation[] }> = [
   {
     label: "Contacts",
@@ -126,8 +159,8 @@ const OP_GROUPS: Array<{ label: string; ops: HubspotOperation[] }> = [
       HubspotOperation.UPDATE_CONTACT,
       HubspotOperation.DELETE_CONTACT,
       HubspotOperation.SEARCH_CONTACTS,
-      HubspotOperation.GET_CONTACT_PROPERTIES,
       HubspotOperation.UPSERT_CONTACT,
+      HubspotOperation.GET_CONTACT_PROPERTIES,
       HubspotOperation.GET_CONTACT_ASSOCIATIONS,
     ],
   },
@@ -163,7 +196,7 @@ const OP_GROUPS: Array<{ label: string; ops: HubspotOperation[] }> = [
     ],
   },
   {
-    label: "Activities",
+    label: "Activities (Engagements)",
     ops: [
       HubspotOperation.CREATE_NOTE,
       HubspotOperation.CREATE_TASK,
@@ -184,7 +217,7 @@ const OP_GROUPS: Array<{ label: string; ops: HubspotOperation[] }> = [
     ],
   },
   {
-    label: "Generic",
+    label: "Generic (legacy)",
     ops: [HubspotOperation.SEARCH_OBJECTS, HubspotOperation.GET_PROPERTIES],
   },
 ]
@@ -214,87 +247,79 @@ export const HubspotDialog = ({
   const queryClient = useQueryClient()
   const { data: credentials } = useCredentialsByType(CredentialType.HUBSPOT)
 
-  const { data: existingConfig, isLoading } = useQuery(
-    trpc.hubspot.getByNodeId.queryOptions(
-      { nodeId: nodeId ?? "" },
-      { enabled: !!nodeId }
-    )
-  )
-
-  const upsert = useMutation(trpc.hubspot.upsert.mutationOptions())
+  const isLoading = false
 
   const initialState: HubspotFormValues = useMemo(
     () => ({
-      credentialId: defaultValues.credentialId || existingConfig?.credentialId || "",
+      credentialId: defaultValues.credentialId || "",
       operation:
         (defaultValues.operation as HubspotOperation | undefined) ||
-        existingConfig?.operation ||
         HubspotOperation.CREATE_CONTACT,
-      variableName: defaultValues.variableName || existingConfig?.variableName || "hubspot",
-      objectType: defaultValues.objectType || existingConfig?.objectType || "contacts",
-      recordId: defaultValues.recordId || existingConfig?.recordId || "",
-      email: defaultValues.email || existingConfig?.email || "",
-      firstName: defaultValues.firstName || existingConfig?.firstName || "",
-      lastName: defaultValues.lastName || existingConfig?.lastName || "",
-      phone: defaultValues.phone || existingConfig?.phone || "",
-      website: defaultValues.website || existingConfig?.website || "",
-      company: defaultValues.company || existingConfig?.company || "",
-      jobTitle: defaultValues.jobTitle || existingConfig?.jobTitle || "",
-      lifecycleStage: defaultValues.lifecycleStage || existingConfig?.lifecycleStage || "",
-      leadStatus: defaultValues.leadStatus || existingConfig?.leadStatus || "",
-      companyName: defaultValues.companyName || existingConfig?.companyName || "",
-      domain: defaultValues.domain || existingConfig?.domain || "",
-      industry: defaultValues.industry || existingConfig?.industry || "",
-      annualRevenue: defaultValues.annualRevenue || existingConfig?.annualRevenue || "",
-      numberOfEmployees: defaultValues.numberOfEmployees || existingConfig?.numberOfEmployees || "",
-      city: defaultValues.city || existingConfig?.city || "",
-      state: defaultValues.state || existingConfig?.state || "",
-      country: defaultValues.country || existingConfig?.country || "India",
-      dealName: defaultValues.dealName || existingConfig?.dealName || "",
-      dealStage: defaultValues.dealStage || existingConfig?.dealStage || "",
-      pipeline: defaultValues.pipeline || existingConfig?.pipeline || "default",
-      amount: defaultValues.amount || existingConfig?.amount || "",
-      closeDate: defaultValues.closeDate || existingConfig?.closeDate || "",
-      dealType: defaultValues.dealType || existingConfig?.dealType || "",
-      priority: defaultValues.priority || existingConfig?.priority || "",
-      ticketName: defaultValues.ticketName || existingConfig?.ticketName || "",
-      ticketPipeline: defaultValues.ticketPipeline || existingConfig?.ticketPipeline || "0",
-      ticketStatus: defaultValues.ticketStatus || existingConfig?.ticketStatus || "",
-      ticketPriority: defaultValues.ticketPriority || existingConfig?.ticketPriority || "",
-      ticketDescription: defaultValues.ticketDescription || existingConfig?.ticketDescription || "",
-      ticketSource: defaultValues.ticketSource || existingConfig?.ticketSource || "",
-      noteBody: defaultValues.noteBody || existingConfig?.noteBody || "",
-      taskSubject: defaultValues.taskSubject || existingConfig?.taskSubject || "",
-      taskBody: defaultValues.taskBody || existingConfig?.taskBody || "",
-      taskStatus: defaultValues.taskStatus || existingConfig?.taskStatus || "NOT_STARTED",
-      taskPriority: defaultValues.taskPriority || existingConfig?.taskPriority || "NONE",
-      taskDueDate: defaultValues.taskDueDate || existingConfig?.taskDueDate || "",
-      callBody: defaultValues.callBody || existingConfig?.callBody || "",
-      callDuration: defaultValues.callDuration || existingConfig?.callDuration || "",
-      callDirection: defaultValues.callDirection || existingConfig?.callDirection || "OUTBOUND",
-      callDisposition: defaultValues.callDisposition || existingConfig?.callDisposition || "",
-      emailSubject: defaultValues.emailSubject || existingConfig?.emailSubject || "",
-      emailBody: defaultValues.emailBody || existingConfig?.emailBody || "",
-      emailFrom: defaultValues.emailFrom || existingConfig?.emailFrom || "",
-      emailTo: defaultValues.emailTo || existingConfig?.emailTo || "",
-      fromObjectType: defaultValues.fromObjectType || existingConfig?.fromObjectType || "contacts",
-      fromObjectId: defaultValues.fromObjectId || existingConfig?.fromObjectId || "",
-      toObjectType: defaultValues.toObjectType || existingConfig?.toObjectType || "deals",
-      toObjectId: defaultValues.toObjectId || existingConfig?.toObjectId || "",
-      associationType: defaultValues.associationType || existingConfig?.associationType || "",
-      listId: defaultValues.listId || existingConfig?.listId || "",
-      searchQuery: defaultValues.searchQuery || existingConfig?.searchQuery || "",
-      filterProperty: defaultValues.filterProperty || existingConfig?.filterProperty || "",
-      filterOperator: defaultValues.filterOperator || existingConfig?.filterOperator || "EQ",
-      filterValue: defaultValues.filterValue || existingConfig?.filterValue || "",
-      sortProperty: defaultValues.sortProperty || existingConfig?.sortProperty || "createdate",
-      sortDirection: defaultValues.sortDirection || existingConfig?.sortDirection || "DESCENDING",
-      limit: defaultValues.limit ?? existingConfig?.limit ?? 10,
-      after: defaultValues.after || existingConfig?.after || "",
-      customProperties: defaultValues.customProperties || existingConfig?.customProperties || "{}",
-      continueOnFail: defaultValues.continueOnFail ?? existingConfig?.continueOnFail ?? false,
+      variableName: defaultValues.variableName || "hubspot",
+      objectType: defaultValues.objectType || "contacts",
+      recordId: defaultValues.recordId || "",
+      email: defaultValues.email || "",
+      firstName: defaultValues.firstName || "",
+      lastName: defaultValues.lastName || "",
+      phone: defaultValues.phone || "",
+      website: defaultValues.website || "",
+      company: defaultValues.company || "",
+      jobTitle: defaultValues.jobTitle || "",
+      lifecycleStage: defaultValues.lifecycleStage || "",
+      leadStatus: defaultValues.leadStatus || "",
+      companyName: defaultValues.companyName || "",
+      domain: defaultValues.domain || "",
+      industry: defaultValues.industry || "",
+      annualRevenue: defaultValues.annualRevenue || "",
+      numberOfEmployees: defaultValues.numberOfEmployees || "",
+      city: defaultValues.city || "",
+      state: defaultValues.state || "",
+      country: defaultValues.country || "India",
+      dealName: defaultValues.dealName || "",
+      dealStage: defaultValues.dealStage || "",
+      pipeline: defaultValues.pipeline || "default",
+      amount: defaultValues.amount || "",
+      closeDate: defaultValues.closeDate || "",
+      dealType: defaultValues.dealType || "",
+      priority: defaultValues.priority || "",
+      ticketName: defaultValues.ticketName || "",
+      ticketPipeline: defaultValues.ticketPipeline || "0",
+      ticketStatus: defaultValues.ticketStatus || "",
+      ticketPriority: defaultValues.ticketPriority || "",
+      ticketDescription: defaultValues.ticketDescription || "",
+      ticketSource: defaultValues.ticketSource || "",
+      noteBody: defaultValues.noteBody || "",
+      taskSubject: defaultValues.taskSubject || "",
+      taskBody: defaultValues.taskBody || "",
+      taskStatus: defaultValues.taskStatus || "NOT_STARTED",
+      taskPriority: defaultValues.taskPriority || "NONE",
+      taskDueDate: defaultValues.taskDueDate || "",
+      callBody: defaultValues.callBody || "",
+      callDuration: defaultValues.callDuration || "",
+      callDirection: defaultValues.callDirection || "OUTBOUND",
+      callDisposition: defaultValues.callDisposition || "",
+      emailSubject: defaultValues.emailSubject || "",
+      emailBody: defaultValues.emailBody || "",
+      emailFrom: defaultValues.emailFrom || "",
+      emailTo: defaultValues.emailTo || "",
+      fromObjectType: defaultValues.fromObjectType || "contacts",
+      fromObjectId: defaultValues.fromObjectId || "",
+      toObjectType: defaultValues.toObjectType || "deals",
+      toObjectId: defaultValues.toObjectId || "",
+      associationType: defaultValues.associationType || "",
+      listId: defaultValues.listId || "",
+      searchQuery: defaultValues.searchQuery || "",
+      filterProperty: defaultValues.filterProperty || "",
+      filterOperator: defaultValues.filterOperator || "EQ",
+      filterValue: defaultValues.filterValue || "",
+      sortProperty: defaultValues.sortProperty || "createdate",
+      sortDirection: defaultValues.sortDirection || "DESCENDING",
+      limit: defaultValues.limit ?? 10,
+      after: defaultValues.after || "",
+      customProperties: defaultValues.customProperties || "{}",
+      continueOnFail: defaultValues.continueOnFail ?? false,
     }),
-    [defaultValues, existingConfig]
+    [defaultValues],
   )
 
   const [formValues, setFormValues] = useState<HubspotFormValues>(initialState)
@@ -307,21 +332,13 @@ export const HubspotDialog = ({
     setFormValues((prev) => ({ ...prev, [key]: value }))
   }
 
-  const handleSave = async () => {
-    if (!nodeId || !workflowId) return
-    const payload = {
+  const handleSave = () => {
+    const payload: HubspotFormValues = {
       ...formValues,
-      nodeId,
-      workflowId,
       operation: formValues.operation ?? HubspotOperation.CREATE_CONTACT,
       variableName: formValues.variableName || "hubspot",
       limit: Number(formValues.limit ?? 10),
     }
-    await upsert.mutateAsync(payload, {
-      onSuccess: () => {
-        queryClient.invalidateQueries(trpc.hubspot.getByNodeId.queryOptions({ nodeId }))
-      },
-    })
     onSubmit(payload)
     onOpenChange(false)
   }
@@ -349,7 +366,10 @@ export const HubspotDialog = ({
       <DialogContent className="max-h-[85vh] overflow-y-auto max-w-4xl">
         <DialogHeader>
           <DialogTitle>Configure HubSpot</DialogTitle>
-          <DialogDescription>OAuth-powered HubSpot CRM node with 35 operations.</DialogDescription>
+          <DialogDescription>
+            HubSpot CRM. Ops marked Corsair use the multi-tenant integration
+            backbone when enabled; others use the legacy OAuth path.
+          </DialogDescription>
         </DialogHeader>
 
         {isLoading ? (
@@ -410,7 +430,14 @@ export const HubspotDialog = ({
                         <SelectLabel>{group.label}</SelectLabel>
                         {group.ops.map((op) => (
                           <SelectItem key={op} value={op}>
-                            {op.replace(/_/g, " ")}
+                            <span className="flex items-center gap-2">
+                              {op.replace(/_/g, " ")}
+                              {CORSAIR_OPS.has(op) && (
+                                <span className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
+                                  Corsair
+                                </span>
+                              )}
+                            </span>
                           </SelectItem>
                         ))}
                       </SelectGroup>
@@ -574,8 +601,11 @@ export const HubspotDialog = ({
               <Button variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleSave} disabled={upsert.isPending}>
-                {upsert.isPending ? <Loader2Icon className="mr-2 size-4 animate-spin" /> : <CheckIcon className="mr-2 size-4" />}
+              <Button
+                onClick={handleSave}
+                disabled={!formValues.credentialId?.trim()}
+              >
+                <CheckIcon className="mr-2 size-4" />
                 Save
               </Button>
             </div>

@@ -7,7 +7,7 @@ import { HubspotDialog, HubspotFormValues } from "./dialog"
 import { useNodeStatus } from "@/features/triggers/components/shared/hooks/use-node-status"
 import { HUBSPOT_CHANNEL_NAME } from "@/inngest/channels/hubspot"
 import { fetchHubspotRealtimeToken } from "./actions"
-import { HubspotOperation } from "@/generated/prisma"
+import { HubspotOperation } from "@/features/executions/enums"
 import { useParams } from "next/navigation"
 
 type HubspotNodeData = {

@@ -62,6 +62,7 @@ export interface SlackFormValues {
   sendAt?: string
   content?: string
   fileId?: string
+  searchQuery?: string
 }
 
 interface SlackDialogProps {
@@ -80,6 +81,7 @@ type SlackOp =
   | "MESSAGE_DELETE"
   | "MESSAGE_GET_PERMALINK"
   | "MESSAGE_SCHEDULE"
+  | "MESSAGE_SEARCH"
   | "CHANNEL_GET"
   | "CHANNEL_LIST"
   | "CHANNEL_CREATE"
@@ -89,26 +91,32 @@ type SlackOp =
   | "CHANNEL_KICK"
   | "CHANNEL_SET_TOPIC"
   | "CHANNEL_SET_PURPOSE"
+  | "CHANNEL_HISTORY"
+  | "CHANNEL_RENAME"
+  | "CONVERSATION_OPEN"
   | "USER_GET"
   | "USER_GET_BY_EMAIL"
   | "USER_LIST"
   | "USER_SET_STATUS"
+  | "USER_GET_PRESENCE"
   | "FILE_UPLOAD"
   | "FILE_GET"
+  | "FILE_LIST"
   | "FILE_DELETE"
   | "REACTION_ADD"
   | "REACTION_REMOVE"
   | "REACTION_GET"
 
-const DEFAULT_OPERATION: SlackOp = "MESSAGE_SEND_WEBHOOK"
+const DEFAULT_OPERATION: SlackOp = "MESSAGE_SEND"
 
 const OPERATION_LABELS: Record<SlackOp, string> = {
   MESSAGE_SEND: "Send Message (API)",
-  MESSAGE_SEND_WEBHOOK: "Send via Webhook",
+  MESSAGE_SEND_WEBHOOK: "Send via Webhook (legacy)",
   MESSAGE_UPDATE: "Update Message",
   MESSAGE_DELETE: "Delete Message",
   MESSAGE_GET_PERMALINK: "Get Permalink",
-  MESSAGE_SCHEDULE: "Schedule Message",
+  MESSAGE_SCHEDULE: "Schedule Message (legacy)",
+  MESSAGE_SEARCH: "Search Messages",
   CHANNEL_GET: "Get Channel",
   CHANNEL_LIST: "List Channels",
   CHANNEL_CREATE: "Create Channel",
@@ -118,13 +126,18 @@ const OPERATION_LABELS: Record<SlackOp, string> = {
   CHANNEL_KICK: "Remove from Channel",
   CHANNEL_SET_TOPIC: "Set Topic",
   CHANNEL_SET_PURPOSE: "Set Purpose",
+  CHANNEL_HISTORY: "Channel History",
+  CHANNEL_RENAME: "Rename Channel",
+  CONVERSATION_OPEN: "Open Conversation (DM)",
   USER_GET: "Get User",
-  USER_GET_BY_EMAIL: "Get User by Email",
+  USER_GET_BY_EMAIL: "Get User by Email (legacy)",
   USER_LIST: "List Users",
   USER_SET_STATUS: "Set Status",
+  USER_GET_PRESENCE: "Get Presence",
   FILE_UPLOAD: "Upload File",
   FILE_GET: "Get File",
-  FILE_DELETE: "Delete File",
+  FILE_LIST: "List Files",
+  FILE_DELETE: "Delete File (legacy)",
   REACTION_ADD: "Add Reaction",
   REACTION_REMOVE: "Remove Reaction",
   REACTION_GET: "Get Reactions",
@@ -139,6 +152,7 @@ const OPERATION_GROUPS: { label: string; ops: SlackOp[] }[] = [
       "MESSAGE_UPDATE",
       "MESSAGE_DELETE",
       "MESSAGE_GET_PERMALINK",
+      "MESSAGE_SEARCH",
       "MESSAGE_SCHEDULE",
     ],
   },
@@ -154,15 +168,24 @@ const OPERATION_GROUPS: { label: string; ops: SlackOp[] }[] = [
       "CHANNEL_KICK",
       "CHANNEL_SET_TOPIC",
       "CHANNEL_SET_PURPOSE",
+      "CHANNEL_HISTORY",
+      "CHANNEL_RENAME",
+      "CONVERSATION_OPEN",
     ],
   },
   {
     label: "Users",
-    ops: ["USER_GET", "USER_GET_BY_EMAIL", "USER_LIST", "USER_SET_STATUS"],
+    ops: [
+      "USER_GET",
+      "USER_GET_BY_EMAIL",
+      "USER_LIST",
+      "USER_SET_STATUS",
+      "USER_GET_PRESENCE",
+    ],
   },
   {
     label: "Files",
-    ops: ["FILE_UPLOAD", "FILE_GET", "FILE_DELETE"],
+    ops: ["FILE_UPLOAD", "FILE_GET", "FILE_LIST", "FILE_DELETE"],
   },
   {
     label: "Reactions",
@@ -179,6 +202,7 @@ const OUTPUT_HINTS: Partial<Record<SlackOp, string[]>> = {
   MESSAGE_DELETE: ["messageTs", "channel"],
   MESSAGE_GET_PERMALINK: ["permalink"],
   MESSAGE_SCHEDULE: ["scheduledMessageId", "postAt", "channel"],
+  MESSAGE_SEARCH: ["query", "messages"],
   CHANNEL_GET: ["channelId", "name", "memberCount"],
   CHANNEL_LIST: ["channels", "count"],
   CHANNEL_CREATE: ["channelId", "name", "memberCount"],
@@ -188,16 +212,21 @@ const OUTPUT_HINTS: Partial<Record<SlackOp, string[]>> = {
   CHANNEL_KICK: ["ok", "channel"],
   CHANNEL_SET_TOPIC: ["ok", "topic"],
   CHANNEL_SET_PURPOSE: ["ok", "purpose"],
-  USER_GET: ["userId", "email", "displayName"],
+  CHANNEL_HISTORY: ["messages", "hasMore"],
+  CHANNEL_RENAME: ["channelId", "name"],
+  CONVERSATION_OPEN: ["channelId"],
+  USER_GET: ["userId", "email", "displayName", "name"],
   USER_GET_BY_EMAIL: ["userId", "email", "displayName"],
   USER_LIST: ["users", "count"],
-  USER_SET_STATUS: ["ok", "statusText"],
-  FILE_UPLOAD: ["fileId", "permalink"],
-  FILE_GET: ["id", "name", "permalink"],
+  USER_SET_STATUS: ["ok", "statusText", "profile"],
+  USER_GET_PRESENCE: ["presence", "online"],
+  FILE_UPLOAD: ["file", "fileId", "permalink"],
+  FILE_GET: ["file", "id", "name", "permalink"],
+  FILE_LIST: ["files"],
   FILE_DELETE: ["ok", "fileId"],
   REACTION_ADD: ["ok", "emoji"],
   REACTION_REMOVE: ["ok", "emoji"],
-  REACTION_GET: ["reactions"],
+  REACTION_GET: ["reactions", "message"],
 }
 
 const needsCredential = (op: SlackOp) => op !== "MESSAGE_SEND_WEBHOOK"
@@ -310,113 +339,65 @@ export const SlackDialog = ({
   const [sendAt, setSendAt] = useState(defaultValues.sendAt || "")
   const [content, setContent] = useState(defaultValues.content || "")
   const [fileId, setFileId] = useState(defaultValues.fileId || "")
+  const [searchQuery, setSearchQuery] = useState(
+    defaultValues.searchQuery || "",
+  )
   const [saved, setSaved] = useState(false)
 
   // ── Queries ──
   const { data: credentials, isLoading: isLoadingCredentials } =
     useCredentialsByType(CredentialType.SLACK)
 
-  const { data: config, isLoading } = useQuery(
-    trpc.slack.getByNodeId.queryOptions(
-      { nodeId: nodeId! },
-      { enabled: open && !!nodeId }
-    )
-  )
-
-  // Pre-fill from DB config
-  useEffect(() => {
-    if (config) {
-      setCredentialId(config.credentialId || "")
-      setOperation(config.operation as SlackOp)
-      setVariableName(config.variableName)
-      setChannel(config.channel)
-      setMessage(config.message)
-      setThreadTs(config.threadTs)
-      setMessageTs(config.messageTs)
-      setChannelName(config.channelName)
-      setChannelTopic(config.channelTopic)
-      setChannelPurpose(config.channelPurpose)
-      setSlackUserId(config.userId)
-      setEmoji(config.emoji)
-      setBlockKit(config.blockKit)
-      setBotName(config.botName)
-      setIconEmoji(config.iconEmoji)
-      setUnfurlLinks(config.unfurlLinks)
-      setChannelTypes(config.channelTypes)
-      setLimit(config.limit)
-      setExcludeArchived(config.excludeArchived)
-      setIsPrivate(config.isPrivate)
-      setFilename(config.filename)
-      setFileType(config.fileType)
-      setTitle(config.title)
-      setInitialComment(config.initialComment)
-      setEmail(config.email)
-      setStatusText(config.statusText)
-      setStatusEmoji(config.statusEmoji)
-      setStatusExpiration(config.statusExpiration || "0")
-      setSendAt(config.sendAt)
-      setContent(config.content)
-      setFileId(config.fileId)
-    }
-  }, [config])
+  const isLoading = false
 
   // Reset when dialog opens with defaultValues
   useEffect(() => {
-    if (open && !config) {
-      setCredentialId(defaultValues.credentialId || "")
-      setOperation(
-        (defaultValues.operation as SlackOp) || DEFAULT_OPERATION
-      )
-      setVariableName(defaultValues.variableName || "slack")
-      setChannel(defaultValues.channel || "")
-      setMessage(defaultValues.message || "")
-      setThreadTs(defaultValues.threadTs || "")
-      setMessageTs(defaultValues.messageTs || "")
-      setChannelName(defaultValues.channelName || "")
-      setChannelTopic(defaultValues.channelTopic || "")
-      setChannelPurpose(defaultValues.channelPurpose || "")
-      setSlackUserId(defaultValues.userId || "")
-      setEmoji(defaultValues.emoji || "")
-      setBlockKit(defaultValues.blockKit || "")
-      setBotName(defaultValues.botName || "")
-      setIconEmoji(defaultValues.iconEmoji || "")
-      setUnfurlLinks(defaultValues.unfurlLinks ?? true)
-      setChannelTypes(
-        defaultValues.channelTypes || "public_channel,private_channel"
-      )
-      setLimit(defaultValues.limit ?? 100)
-      setExcludeArchived(defaultValues.excludeArchived ?? true)
-      setIsPrivate(defaultValues.isPrivate ?? false)
-      setFilename(defaultValues.filename || "")
-      setFileType(defaultValues.fileType || "")
-      setTitle(defaultValues.title || "")
-      setInitialComment(defaultValues.initialComment || "")
-      setEmail(defaultValues.email || "")
-      setStatusText(defaultValues.statusText || "")
-      setStatusEmoji(defaultValues.statusEmoji || "")
-      setStatusExpiration(defaultValues.statusExpiration || "0")
-      setSendAt(defaultValues.sendAt || "")
-      setContent(defaultValues.content || "")
-      setFileId(defaultValues.fileId || "")
-    }
-  }, [open, defaultValues, config])
+    if (!open) return
+    setCredentialId(defaultValues.credentialId || "")
+    setOperation((defaultValues.operation as SlackOp) || DEFAULT_OPERATION)
+    setVariableName(defaultValues.variableName || "slack")
+    setChannel(defaultValues.channel || "")
+    setMessage(defaultValues.message || "")
+    setThreadTs(defaultValues.threadTs || "")
+    setMessageTs(defaultValues.messageTs || "")
+    setChannelName(defaultValues.channelName || "")
+    setChannelTopic(defaultValues.channelTopic || "")
+    setChannelPurpose(defaultValues.channelPurpose || "")
+    setSlackUserId(defaultValues.userId || "")
+    setEmoji(defaultValues.emoji || "")
+    setBlockKit(defaultValues.blockKit || "")
+    setBotName(defaultValues.botName || "")
+    setIconEmoji(defaultValues.iconEmoji || "")
+    setUnfurlLinks(defaultValues.unfurlLinks ?? true)
+    setChannelTypes(
+      defaultValues.channelTypes || "public_channel,private_channel",
+    )
+    setLimit(defaultValues.limit ?? 100)
+    setExcludeArchived(defaultValues.excludeArchived ?? true)
+    setIsPrivate(defaultValues.isPrivate ?? false)
+    setFilename(defaultValues.filename || "")
+    setFileType(defaultValues.fileType || "")
+    setTitle(defaultValues.title || "")
+    setInitialComment(defaultValues.initialComment || "")
+    setEmail(defaultValues.email || "")
+    setStatusText(defaultValues.statusText || "")
+    setStatusEmoji(defaultValues.statusEmoji || "")
+    setStatusExpiration(defaultValues.statusExpiration || "0")
+    setSendAt(defaultValues.sendAt || "")
+    setContent(defaultValues.content || "")
+    setFileId(defaultValues.fileId || "")
+    setSearchQuery(defaultValues.searchQuery || "")
+  }, [open, defaultValues])
 
-  // ── Mutation ──
-  const upsertMutation = useMutation(
-    trpc.slack.upsert.mutationOptions({
-      onSuccess: () => {
-        if (nodeId) {
-          queryClient.invalidateQueries(
-            trpc.slack.getByNodeId.queryOptions({ nodeId })
-          )
-        }
-        setSaved(true)
-        setTimeout(() => setSaved(false), 2000)
-      },
-    })
-  )
+  // ── Mutation stub (canvas parent owns persistence) ──
+  const upsertMutation = {
+    isPending: false,
+    mutate: (_args?: Record<string, unknown>) => {
+      /* no-op */
+    },
+  }
 
-  const isValid = needsCredential(operation)
+const isValid = needsCredential(operation)
     ? !!credentialId.trim()
     : true
 
@@ -457,6 +438,7 @@ export const SlackDialog = ({
       sendAt,
       content,
       fileId,
+      searchQuery,
     }
 
     onSubmit(values)
@@ -465,37 +447,8 @@ export const SlackDialog = ({
       upsertMutation.mutate({
         workflowId,
         nodeId,
+        ...values,
         credentialId: credentialId || undefined,
-        operation,
-        variableName,
-        channel,
-        message,
-        threadTs,
-        messageTs,
-        channelName,
-        channelTopic,
-        channelPurpose,
-        userId: slackUserId,
-        emoji,
-        blockKit,
-        botName,
-        iconEmoji,
-        unfurlLinks,
-        channelTypes,
-        limit,
-        excludeArchived,
-        isPrivate,
-        filename,
-        fileType,
-        title,
-        initialComment,
-        email,
-        statusText,
-        statusEmoji,
-        statusExpiration: resolvedExpiration,
-        sendAt,
-        content,
-        fileId,
       })
     }
   }
@@ -806,6 +759,29 @@ export const SlackDialog = ({
             )}
 
             {/* ── MESSAGE_SCHEDULE ── */}
+            {operation === "MESSAGE_SEARCH" && (
+              <>
+                <div className="space-y-2">
+                  <Label>Search Query *</Label>
+                  <Input
+                    placeholder="from:@user in:#channel after:2024-01-01"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Max Results</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={limit}
+                    onChange={(e) => setLimit(parseInt(e.target.value) || 20)}
+                  />
+                </div>
+              </>
+            )}
+
             {operation === "MESSAGE_SCHEDULE" && (
               <>
                 <div className="space-y-2">
@@ -1011,6 +987,64 @@ export const SlackDialog = ({
             )}
 
             {/* ── CHANNEL_SET_PURPOSE ── */}
+            {operation === "CHANNEL_HISTORY" && (
+              <>
+                <div className="space-y-2">
+                  <Label>Channel ID *</Label>
+                  <Input
+                    placeholder="C01234567"
+                    value={channel}
+                    onChange={(e) => setChannel(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Limit</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={200}
+                    value={limit}
+                    onChange={(e) => setLimit(parseInt(e.target.value) || 100)}
+                  />
+                </div>
+              </>
+            )}
+
+            {operation === "CHANNEL_RENAME" && (
+              <>
+                <div className="space-y-2">
+                  <Label>Channel ID *</Label>
+                  <Input
+                    placeholder="C01234567"
+                    value={channel}
+                    onChange={(e) => setChannel(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>New Channel Name *</Label>
+                  <Input
+                    placeholder="new-name"
+                    value={channelName}
+                    onChange={(e) => setChannelName(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
+
+            {operation === "CONVERSATION_OPEN" && (
+              <div className="space-y-2">
+                <Label>User ID(s) *</Label>
+                <Input
+                  placeholder="U01234567 or U1,U2"
+                  value={slackUserId}
+                  onChange={(e) => setSlackUserId(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Opens a DM / multi-party IM with the given users
+                </p>
+              </div>
+            )}
+
             {operation === "CHANNEL_SET_PURPOSE" && (
               <>
                 <div className="space-y-2">
@@ -1078,6 +1112,17 @@ export const SlackDialog = ({
             )}
 
             {/* ── USER_SET_STATUS ── */}
+            {operation === "USER_GET_PRESENCE" && (
+              <div className="space-y-2">
+                <Label>User ID *</Label>
+                <Input
+                  placeholder="U01234567"
+                  value={slackUserId}
+                  onChange={(e) => setSlackUserId(e.target.value)}
+                />
+              </div>
+            )}
+
             {operation === "USER_SET_STATUS" && (
               <>
                 <div className="space-y-2">
@@ -1185,6 +1230,29 @@ export const SlackDialog = ({
             )}
 
             {/* ── FILE_GET / FILE_DELETE ── */}
+            {operation === "FILE_LIST" && (
+              <>
+                <div className="space-y-2">
+                  <Label>Channel (optional)</Label>
+                  <Input
+                    placeholder="C01234567"
+                    value={channel}
+                    onChange={(e) => setChannel(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Limit</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={200}
+                    value={limit}
+                    onChange={(e) => setLimit(parseInt(e.target.value) || 100)}
+                  />
+                </div>
+              </>
+            )}
+
             {(operation === "FILE_GET" || operation === "FILE_DELETE") && (
               <div className="space-y-2">
                 <Label>

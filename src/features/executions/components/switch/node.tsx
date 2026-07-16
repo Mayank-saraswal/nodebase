@@ -43,12 +43,7 @@ export const SwitchNode = memo((props: NodeProps) => {
   const workflowId = params.workflowId as string
   const trpc = useTRPC()
 
-  const { data: config } = useQuery(
-    trpc.switch.getByNodeId.queryOptions(
-      { nodeId: props.id },
-      { enabled: !!props.id }
-    )
-  )
+  const config = props.data as any;
 
   const cases = useMemo(() => {
     try {

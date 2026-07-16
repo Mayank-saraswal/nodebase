@@ -25,22 +25,16 @@ import {
 } from "./aggregate-engine"
 import type { AggregateOp, NullHandling } from "./types"
 
-export const aggregateExecutor: NodeExecutor = async ({
-  nodeId,
+export const aggregateExecutor: NodeExecutor = async ({ data, nodeId,
   context,
   step,
   publish,
   userId,
 }) => {
   // Step 1: Load config
-  const config = await step.run(`aggregate-${nodeId}-load`, async () => {
-    return prisma.aggregateNode.findUnique({
-      where: { nodeId },
-      include: { workflow: { select: { userId: true } } },
-    })
-  })
+  const config = data as any;
 
-  await step.run(`aggregate-${nodeId}-validate`, async () => {
+await step.run(`aggregate-${nodeId}-validate`, async () => {
     if (!config) throw new NonRetriableError("Aggregate node not configured.")
     if (config.workflow.userId !== userId) throw new NonRetriableError("Unauthorized")
     return { valid: true }

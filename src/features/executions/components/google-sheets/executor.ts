@@ -1,10 +1,22 @@
-import { NonRetriableError } from "inngest"
-import type { NodeExecutor } from "@/features/executions/types"
+import { NonRetriableError, RetryAfterError } from "inngest"
+import type { NodeExecutor, WorkflowContext } from "@/features/executions/types"
+import {
+  asBoolean,
+  asNumber,
+  asString,
+  type GoogleSheetsData as TypedSheetsData,
+} from "@/features/executions/types"
 import prisma from "@/lib/db"
 import { resolveTemplate } from "@/features/executions/lib/template-resolver"
 import { googleSheetsChannel } from "@/inngest/channels/google-sheets"
-import { GoogleSheetsOp } from "@/generated/prisma"
+import { GoogleSheetsOp } from "@/features/executions/enums"
 import { refreshGoogleSheetsAccessToken } from "@/lib/google-sheets-auth"
+import {
+  mapCorsairError,
+  resolveTenantId,
+} from "@/lib/corsair"
+import { tryRunIntegration } from "@/features/integrations/runner"
+import { NodeType } from "@/generated/prisma"
 
 const SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets"
 
@@ -70,66 +82,113 @@ function rowsToObjects(
 
 // ─── GoogleSheetsData ────────────────────────────────────────────────────────
 
-type GoogleSheetsData = {
-  nodeId?: string
-}
+type GoogleSheetsData = TypedSheetsData & { nodeId?: string }
 
 // ─── Main executor ───────────────────────────────────────────────────────────
 
 export const googleSheetsExecutor: NodeExecutor<GoogleSheetsData> = async ({
+  data,
   nodeId,
   context,
   step,
   publish,
   userId,
-}) => {
+  tenantId: tenantIdParam,
+}): Promise<WorkflowContext> => {
   await publish(
-    googleSheetsChannel().status({ nodeId, status: "loading" })
+    googleSheetsChannel().status({ nodeId, status: "loading" }),
   )
 
   // Step 1: Load config
-  const config = await step.run(
-    `google-sheets-${nodeId}-load`,
-    async () => {
-      return prisma.googleSheetsNode.findUnique({ where: { nodeId } })
-    }
-  )
+  // unknown boundary: node.data is JSON from DB/editor
+  const config = (data ?? {}) as Record<string, unknown>
+  const credentialId = asString(config.credentialId)
+  const spreadsheetId = asString(config.spreadsheetId)
+  const varName = asString(config.variableName, "googleSheets")
+  const operation = asString(config.operation, "READ_ROWS")
+  const headerRow = asBoolean(config.headerRow)
+  const includeEmptyRows = asBoolean(config.includeEmptyRows)
+  const maxResults = asNumber(config.maxResults, 100)
 
-  if (!config || !config.credentialId || !config.spreadsheetId) {
+  // ── Corsair backbone path (Option C generic runner) ──
+  {
+    const tenantId =
+      tenantIdParam && tenantIdParam.trim() !== ""
+        ? tenantIdParam
+        : resolveTenantId({ userId })
+    try {
+      const corsairResult = await step.run(
+        `google-sheets-${nodeId}-corsair`,
+        async () => {
+          return tryRunIntegration({
+            nodeType: NodeType.GOOGLE_SHEETS,
+            data: config,
+            context,
+            nodeId,
+            userId,
+            tenantId,
+          })
+        },
+      )
+      if (corsairResult) {
+        await publish(
+          googleSheetsChannel().status({ nodeId, status: "success" }),
+        )
+        return corsairResult.context
+      }
+    } catch (error) {
+      await publish(
+        googleSheetsChannel().status({ nodeId, status: "error" }),
+      )
+      if (
+        error instanceof NonRetriableError ||
+        error instanceof RetryAfterError
+      ) {
+        throw error
+      }
+      mapCorsairError(error, "Google Sheets")
+    }
+  }
+
+  if (!credentialId || !spreadsheetId) {
     await publish(
-      googleSheetsChannel().status({ nodeId, status: "error" })
+      googleSheetsChannel().status({ nodeId, status: "error" }),
     )
     throw new NonRetriableError(
-      "Google Sheets node not configured. Open settings to configure."
+      "Google Sheets node not configured. Open settings to configure.",
     )
   }
 
+  // ── Legacy path ──
   // Step 2: Get fresh access token (loads credential from DB, decrypts, refreshes)
   const accessToken = await step.run(
     `google-sheets-${nodeId}-token`,
     async () => {
       try {
-        return await refreshGoogleSheetsAccessToken(config.credentialId!, userId)
+        return await refreshGoogleSheetsAccessToken(credentialId, userId)
       } catch (err) {
         await publish(googleSheetsChannel().status({ nodeId, status: "error" }))
         throw new NonRetriableError(
-          err instanceof Error ? err.message : "Google Sheets: Failed to get access token"
+          err instanceof Error
+            ? err.message
+            : "Google Sheets: Failed to get access token",
         )
       }
-    }
+    },
   )
 
-  const spreadsheetId = config.spreadsheetId
-  const sheetName = resolveTemplate(config.sheetName || "Sheet1", context)
-  const range = `${sheetName}!${config.range || "A:Z"}`
-  const varName = config.variableName || "googleSheets"
+  const sheetName = resolveTemplate(
+    asString(config.sheetName, "Sheet1"),
+    context,
+  )
+  const range = `${sheetName}!${asString(config.range, "A:Z")}`
 
   // Step 4: Execute operation
   try {
     const result = await step.run(
       `google-sheets-${nodeId}-execute`,
       async () => {
-        switch (config.operation) {
+        switch (operation) {
           // ── READ_ROWS ────────────────────────────────────────────
           case GoogleSheetsOp.READ_ROWS: {
             const data = await sheetsRequest(
@@ -140,9 +199,9 @@ export const googleSheetsExecutor: NodeExecutor<GoogleSheetsData> = async ({
             const rows = (data.values as string[][] | undefined) ?? []
             const items = rowsToObjects(
               rows,
-              config.headerRow,
-              config.includeEmptyRows,
-              config.maxResults
+              headerRow,
+              includeEmptyRows,
+              maxResults,
             )
             return {
               operation: "READ_ROWS",
@@ -155,8 +214,9 @@ export const googleSheetsExecutor: NodeExecutor<GoogleSheetsData> = async ({
           // ── APPEND_ROW ───────────────────────────────────────────
           case GoogleSheetsOp.APPEND_ROW: {
             let values: string[][]
-            if (config.rowValues && config.rowValues.trim()) {
-              const resolved = resolveTemplate(config.rowValues, context)
+            const rowValuesStr = asString(config.rowValues)
+            if (rowValuesStr.trim()) {
+              const resolved = resolveTemplate(rowValuesStr, context)
               let parsed: unknown
               try {
                 parsed = JSON.parse(resolved)
@@ -227,12 +287,12 @@ export const googleSheetsExecutor: NodeExecutor<GoogleSheetsData> = async ({
 
           // ── UPDATE_ROW ───────────────────────────────────────────
           case GoogleSheetsOp.UPDATE_ROW: {
-            const rowNum = resolveTemplate(config.rowNumber, context)
+            const rowNum = resolveTemplate(asString(config.rowNumber), context)
             if (!rowNum)
               throw new NonRetriableError(
                 "Google Sheets UPDATE_ROW: 'rowNumber' is required."
               )
-            const resolved = resolveTemplate(config.updateValues, context)
+            const resolved = resolveTemplate(config.updateValues as string, context)
             let parsed: unknown
             try {
               parsed = JSON.parse(resolved)
@@ -300,8 +360,8 @@ export const googleSheetsExecutor: NodeExecutor<GoogleSheetsData> = async ({
 
           // ── UPDATE_ROWS_BY_QUERY ─────────────────────────────────
           case GoogleSheetsOp.UPDATE_ROWS_BY_QUERY: {
-            const matchCol = resolveTemplate(config.matchColumn, context)
-            const matchVal = resolveTemplate(config.matchValue, context)
+            const matchCol = resolveTemplate(config.matchColumn as string, context)
+            const matchVal = resolveTemplate(config.matchValue as string, context)
             if (!matchCol || !matchVal)
               throw new NonRetriableError(
                 "Google Sheets UPDATE_ROWS_BY_QUERY: 'matchColumn' and 'matchValue' are required."
@@ -327,7 +387,7 @@ export const googleSheetsExecutor: NodeExecutor<GoogleSheetsData> = async ({
                 `Google Sheets UPDATE_ROWS_BY_QUERY: Column '${matchCol}' not found in headers.`
               )
 
-            const resolved = resolveTemplate(config.updateValues, context)
+            const resolved = resolveTemplate(config.updateValues as string, context)
             let updateObj: Record<string, string>
             try {
               updateObj = JSON.parse(resolved) as Record<string, string>
@@ -393,7 +453,7 @@ export const googleSheetsExecutor: NodeExecutor<GoogleSheetsData> = async ({
 
           // ── DELETE_ROW ───────────────────────────────────────────
           case GoogleSheetsOp.DELETE_ROW: {
-            const rowNum = resolveTemplate(config.rowNumber, context)
+            const rowNum = resolveTemplate(asString(config.rowNumber), context)
             if (!rowNum)
               throw new NonRetriableError(
                 "Google Sheets DELETE_ROW: 'rowNumber' is required."
@@ -444,7 +504,7 @@ export const googleSheetsExecutor: NodeExecutor<GoogleSheetsData> = async ({
 
           // ── GET_ROW_BY_NUMBER ──────────────────────────────────
           case GoogleSheetsOp.GET_ROW_BY_NUMBER: {
-            const rowNumber = resolveTemplate(config.rowNumber, context)
+            const rowNumber = resolveTemplate(asString(config.rowNumber), context)
             if (!rowNumber.trim())
               throw new NonRetriableError(
                 "Google Sheets GET_ROW_BY_NUMBER: rowNumber is required. " +
@@ -465,7 +525,7 @@ export const googleSheetsExecutor: NodeExecutor<GoogleSheetsData> = async ({
                   `?valueRenderOption=UNFORMATTED_VALUE`,
                 accessToken
               ),
-              config.headerRow
+              headerRow
                 ? sheetsRequest(
                     "GET",
                     `/${spreadsheetId}/values/` +
@@ -477,7 +537,7 @@ export const googleSheetsExecutor: NodeExecutor<GoogleSheetsData> = async ({
 
             const rowArr =
               ((rowData.values as string[][] | undefined) ?? [])[0] ?? []
-            const headers = config.headerRow
+            const headers = headerRow
               ? (((headerData.values as string[][] | undefined) ?? [])[0] ??
                   [])
               : rowArr.map((_, i) => String.fromCharCode(65 + i))
@@ -499,12 +559,12 @@ export const googleSheetsExecutor: NodeExecutor<GoogleSheetsData> = async ({
           // ── SEARCH_ROWS ─────────────────────────────────────────
           case GoogleSheetsOp.SEARCH_ROWS: {
             const searchColumn = resolveTemplate(
-              config.searchColumn,
-              context
+              asString(config.searchColumn),
+              context,
             )
             const searchValue = resolveTemplate(
-              config.searchValue,
-              context
+              asString(config.searchValue),
+              context,
             )
             if (!searchColumn.trim())
               throw new NonRetriableError(
@@ -538,13 +598,13 @@ export const googleSheetsExecutor: NodeExecutor<GoogleSheetsData> = async ({
               }
             }
 
-            const sHeaders = config.headerRow ? allValues[0] : []
-            const dataStart = config.headerRow ? 1 : 0
-            const searchColIdx = config.headerRow
+            const sHeaders = headerRow ? allValues[0] : []
+            const dataStart = headerRow ? 1 : 0
+            const searchColIdx = headerRow
               ? sHeaders.indexOf(searchColumn)
               : parseInt(searchColumn) - 1
 
-            if (config.headerRow && searchColIdx === -1) {
+            if (headerRow && searchColIdx === -1) {
               throw new NonRetriableError(
                 `Google Sheets SEARCH_ROWS: Column "${searchColumn}" not found. ` +
                   `Available columns: ${sHeaders.join(", ")}`
@@ -557,7 +617,7 @@ export const googleSheetsExecutor: NodeExecutor<GoogleSheetsData> = async ({
             for (
               let i = dataStart;
               i < allValues.length &&
-              matchedRows.length < config.maxResults;
+              matchedRows.length < maxResults;
               i++
             ) {
               const row = allValues[i]
@@ -565,7 +625,7 @@ export const googleSheetsExecutor: NodeExecutor<GoogleSheetsData> = async ({
                 String(row[searchColIdx] ?? "") ===
                 String(searchValue)
               ) {
-                if (config.headerRow) {
+                if (headerRow) {
                   const obj: Record<string, string> = {}
                   sHeaders.forEach((h, j) => {
                     obj[h] = row[j] ?? ""
@@ -595,14 +655,15 @@ export const googleSheetsExecutor: NodeExecutor<GoogleSheetsData> = async ({
 
           // ── CLEAR_RANGE ─────────────────────────────────────────
           case GoogleSheetsOp.CLEAR_RANGE: {
-            if (!config.clearRange?.trim()) {
+            const clearRangeRaw = asString(config.clearRange)
+            if (!clearRangeRaw.trim()) {
               throw new NonRetriableError(
                 "Google Sheets CLEAR_RANGE: range is required. " +
                 "Example: 'Sheet1!A2:Z' or 'Sheet1!A:A'. " +
                 "Open node settings and fill in the Range field."
               )
             }
-            const resolvedClear = resolveTemplate(config.clearRange, context)
+            const resolvedClear = resolveTemplate(clearRangeRaw, context)
             // If user already included the sheet name (contains "!"), use as-is
             // If not, prefix with sheetName
             const fullRange = resolvedClear.includes("!")
@@ -625,8 +686,8 @@ export const googleSheetsExecutor: NodeExecutor<GoogleSheetsData> = async ({
           // ── CREATE_SHEET ────────────────────────────────────────
           case GoogleSheetsOp.CREATE_SHEET: {
             const newSheetName = resolveTemplate(
-              config.newSheetName,
-              context
+              asString(config.newSheetName),
+              context,
             )
             if (!newSheetName.trim())
               throw new NonRetriableError(
@@ -703,14 +764,14 @@ export const googleSheetsExecutor: NodeExecutor<GoogleSheetsData> = async ({
 
           default:
             throw new NonRetriableError(
-              `Unknown Google Sheets operation: ${config.operation}`
+              `Unknown Google Sheets operation: ${operation}`,
             )
         }
-      }
+      },
     )
 
     await publish(
-      googleSheetsChannel().status({ nodeId, status: "success" })
+      googleSheetsChannel().status({ nodeId, status: "success" }),
     )
 
     return {

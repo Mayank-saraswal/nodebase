@@ -13,6 +13,8 @@ type XNodeData = {
     accessToken?: string
     accessTokenSecret?: string
     content?: string
+    operation?: string
+    variableName?: string
 }
 
 
@@ -46,8 +48,10 @@ export const XNode = memo((props: NodeProps<XNodeType>) => {
 
     }
     const nodeData = props.data
+    const op = nodeData?.operation || "POST_TWEET"
     const description = nodeData?.content
-        ? ` Tweet: ${nodeData.content.slice(0, 50)}...` : "Not configured"
+      ? `${op}: ${nodeData.content.slice(0, 40)}…`
+      : "Not configured"
 
     return (
         <>

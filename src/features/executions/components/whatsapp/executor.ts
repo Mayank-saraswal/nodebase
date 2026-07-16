@@ -4,7 +4,7 @@ import prisma from "@/lib/db"
 import { decrypt } from "@/lib/encryption"
 import { resolveTemplate } from "@/features/executions/lib/template-resolver"
 import { whatsappChannel } from "@/inngest/channels/whatsapp"
-import { WhatsAppOperation } from "@/generated/prisma"
+import { WhatsAppOperation } from "@/features/executions/enums"
 import { uploadMedia } from "@/lib/media-service"
 
 interface WhatsAppCredential {
@@ -16,8 +16,7 @@ type WhatsAppData = {
   nodeId?: string
 }
 
-export const whatsappExecutor: NodeExecutor<WhatsAppData> = async ({
-  nodeId,
+export const whatsappExecutor: NodeExecutor<WhatsAppData> = async ({ data, nodeId,
   context,
   step,
   publish,
@@ -31,11 +30,9 @@ export const whatsappExecutor: NodeExecutor<WhatsAppData> = async ({
   )
 
   // Step 1: Load config
-  const config = await step.run(`whatsapp-${nodeId}-load-config`, async () => {
-    return prisma.whatsAppNode.findUnique({ where: { nodeId } })
-  })
+  const config = data as any;
 
-  if (!config) {
+if (!config) {
     await publish(
       whatsappChannel().status({
         nodeId,

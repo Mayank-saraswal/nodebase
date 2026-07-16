@@ -1,144 +1,114 @@
-import type { NodeExecutor } from "@/features/executions/types";
-import { NonRetriableError } from "inngest";
-import { createOpenAI} from "@ai-sdk/openai";
-import { resolveTemplate } from "@/features/executions/lib/template-resolver";
-import { generateText } from "ai";
-import { openAiChannel } from "@/inngest/channels/openai";
-import prisma from "@/lib/db";
-import { decrypt } from "@/lib/encryption";
+/**
+ * OpenAI dual-path executor:
+ * 1) Corsair full surface when plugin enabled
+ * 2) Shared aiExecutor legacy path (credential + AI SDK)
+ */
+
+import { NonRetriableError, RetryAfterError } from "inngest"
+import type { NodeExecutor, WorkflowContext } from "@/features/executions/types"
+import { asString } from "@/features/executions/types"
+import { openAiChannel } from "@/inngest/channels/openai"
+import {
+  mapCorsairError,
+  resolveTenantId,
+} from "@/lib/corsair"
+import { tryRunIntegration } from "@/features/integrations/runner"
+import { isOpenAICorsairOp } from "@/features/integrations/adapters/openai/operations"
+import { NodeType } from "@/generated/prisma"
+import { aiExecutor } from "@/features/executions/components/ai/executor"
 
 type OpenAiData = {
-    variableName?:string
-    // model?: string;
-    credentialId?:string
-    userPrompt?: string;
-    systemPrompt?: string;
-};
-export const openAiExecutor:NodeExecutor<OpenAiData > = async({
+  variableName?: string
+  credentialId?: string
+  userPrompt?: string
+  systemPrompt?: string
+  operation?: string
+  model?: string
+  provider?: string
+}
+
+export const openAiExecutor: NodeExecutor<OpenAiData> = async (params) => {
+  const {
     data,
     nodeId,
     context,
-    userId,
     step,
-    publish
-}) =>{
+    publish,
+    userId,
+    tenantId: tenantIdParam,
+  } = params
 
-     await publish (
-        openAiChannel().status({
-            nodeId,
-            status:"loading"
-        })
-     )
+  // unknown: Node.data JSON boundary
+  const config = (data ?? {}) as Record<string, unknown>
+  const operation = asString(
+    config.operation ?? config.openaiOperation,
+    "CHAT",
+  )
 
-
-     if (!data.variableName) {
-        await publish(
-            openAiChannel().status({
-                nodeId,
-                status:"error",
-                
-            })
-         );
-         throw new NonRetriableError("OpenAi node: Variable name is missing")
-     }
-
-     if (!data.userPrompt) {
-        await publish(
-            openAiChannel().status({
-                nodeId,
-                status:"error",
-                
-            })
-         );
-         throw new NonRetriableError("OpenAi node: user prompt is missing")
-     }
-
-     if (!data.credentialId) {
-             await publish(
-                 openAiChannel().status({
-                     nodeId,
-                     status:"error",
-                     
-                 })
-              );
-              throw new NonRetriableError("OpenAi node: credential is missing")
-          }
-
-     const credential = await step.run("get-credential",()=>{
-        return prisma.credential.findUnique({
-            where:{
-                id:data.credentialId,
-                userId
-            }
-        })
-    });
-
-    if (!credential) {
-        throw new NonRetriableError("OpenAi node: credential not found")
-    }
-
- 
-    const systemPrompt = data.systemPrompt 
-    ? resolveTemplate(data.systemPrompt, context)
-    :   "You are a helpful assistant" 
-
-    const userPrompt = data.userPrompt 
-    ? resolveTemplate(data.userPrompt, context)
-    : "No prompt provided"
-
-    
-     
-
-    const openai = createOpenAI({
-        apiKey: decrypt(credential.value)
-    })
-
-
+  // ── Corsair path ──
+  if (isOpenAICorsairOp(operation) && userId) {
+    await publish(
+      openAiChannel().status({
+        nodeId,
+        status: "loading",
+      }),
+    )
+    const tenantId =
+      tenantIdParam && tenantIdParam.trim() !== ""
+        ? tenantIdParam
+        : resolveTenantId({ userId })
     try {
-        const {steps} = await step.ai.wrap(
-            "openai-generate-text",
-            generateText,
-            {
-                model: openai("gpt-5.1"),
-                prompt: userPrompt,
-                system: systemPrompt,
-                experimental_telemetry:{
-                    isEnabled:true,
-                    recordInputs:true,
-                    recordOutputs:true
-                }
+      const corsairResult = await step.run(
+        `openai-${nodeId}-corsair`,
+        async () => {
+          return tryRunIntegration({
+            nodeType: NodeType.OPENAI,
+            data: {
+              ...config,
+              operation,
+              userPrompt:
+                config.userPrompt ?? config.prompt ?? config.message,
+              systemPrompt: config.systemPrompt ?? config.system,
             },
-        )
-
-        const  text = 
-        steps[0].content[0].type==="text"
-        ? steps[0].content[0].text
-        :""
-
+            context,
+            nodeId,
+            userId,
+            tenantId,
+          })
+        },
+      )
+      if (corsairResult) {
         await publish(
-            openAiChannel().status({
-                nodeId,
-                status:"success",
-                
-            }),
+          openAiChannel().status({ nodeId, status: "success" }),
         )
-            return {
-                ...context,
-                [data.variableName]:{
-                    aiResponse:text,
-                },
-            }
-        
-        
+        return corsairResult.context
+      }
+      // null = plugin disabled → legacy
     } catch (error) {
-        console.error('OpenAi API Error:', error);
-        await publish(
-            openAiChannel().status({
-                nodeId,
-                status:"error",
-                
-            })
-         )
-        throw new NonRetriableError(`OpenAi API error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      if (
+        error instanceof NonRetriableError ||
+        error instanceof RetryAfterError
+      ) {
+        await publish(openAiChannel().status({ nodeId, status: "error" }))
+        throw error
+      }
+      // Unexpected Corsair transport errors → map (throws) unless we prefer legacy.
+      // Prefer explicit failure for real API errors.
+      await publish(openAiChannel().status({ nodeId, status: "error" }))
+      mapCorsairError(error, "OpenAI")
     }
+  }
+
+  // ── Legacy shared AI executor ──
+  const legacyData = {
+    ...config,
+    provider: "OPENAI",
+    operation: asString(config.operation, "CHAT"),
+    model: asString(config.model, "gpt-4o-mini"),
+  }
+
+  return (await aiExecutor({
+    ...params,
+    data: legacyData as never,
+  })) as WorkflowContext
 }

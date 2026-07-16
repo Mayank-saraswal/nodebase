@@ -233,16 +233,11 @@ export function AggregateDialog({
 }: AggregateDialogProps) {
   const trpc = useTRPC()
 
-  const { data: dbConfig } = useQuery(
-    trpc.aggregate.getByNodeId.queryOptions(
-      { nodeId },
-      { enabled: !!nodeId }
-    )
-  )
+  const dbConfig = undefined as any;
 
-  const upsertMutation = useMutation(trpc.aggregate.upsert.mutationOptions())
+const upsertMutation = { isPending: false, mutate: (args?: any) => {}, mutateAsync: async (args?: any) => {} } as any;
 
-  const merged = { ...defaultValues, ...dbConfig }
+const merged = { ...defaultValues, ...dbConfig }
 
   const form = useForm<AggregateNodeData>({
     defaultValues: {

@@ -5,6 +5,9 @@ import { PAGINATION } from "@/config/constants";
 import { CredentialType } from "@/generated/prisma";
 import { encrypt, decrypt } from "@/lib/encryption";
 import { TRPCError } from "@trpc/server";
+import { testConnection } from "@/features/executions/components/postgres/postgres-engine";
+import type { PostgresConnectionConfig } from "@/features/executions/components/postgres/postgres-engine";
+import { refreshGmailAccessToken } from "@/lib/gmail-auth";
 
 
 
@@ -116,6 +119,8 @@ export const credentialsRouter = createTRPCRouter({
             
             let connectedEmail: string | undefined
             let isGoogleOAuth = false
+            let connectedGithubUsername: string | undefined
+            let isGithubOAuth = false
 
             if (googleTypes.includes(credential.type)) {
                 try {
@@ -129,11 +134,25 @@ export const credentialsRouter = createTRPCRouter({
 
                 // Strip value for Google — UI uses connectedEmail/isGoogleOAuth instead
                 const { value: _v, ...googleFields } = credential
-                return { ...googleFields, connectedEmail, isGoogleOAuth }
+                return { ...googleFields, connectedEmail, isGoogleOAuth, connectedGithubUsername: undefined, isGithubOAuth: false }
             }
 
-            // Non-Google: return value so form can pre-populate credential fields
-            return { ...credential, connectedEmail: undefined, isGoogleOAuth: false }
+            if (credential.type === CredentialType.GITHUB_APP) {
+                try {
+                    const parsed = JSON.parse(decrypt(credential.value)) as {
+                        username?: string
+                        accessToken?: string
+                    }
+                    connectedGithubUsername = parsed.username
+                    isGithubOAuth = !!parsed.accessToken
+                } catch { /* ignore */ }
+
+                const { value: _v, ...githubFields } = credential
+                return { ...githubFields, connectedEmail: undefined, isGoogleOAuth: false, connectedGithubUsername, isGithubOAuth }
+            }
+
+            // Non-Google and Non-GitHubApp: return value so form can pre-populate credential fields
+            return { ...credential, connectedEmail: undefined, isGoogleOAuth: false, connectedGithubUsername: undefined, isGithubOAuth: false }
         }),
 
     getMany: protectedProcedure
@@ -208,5 +227,58 @@ export const credentialsRouter = createTRPCRouter({
                     updatedAt: "desc"
                 },
             })
+        }),
+    getByTypes: protectedProcedure
+        .input(
+            z.object({
+                types: z.array(z.nativeEnum(CredentialType))
+            })
+        )
+        .query(({ ctx, input }) => {
+            const { types } = input;
+            return prisma.credential.findMany({
+                where: {
+                    userId: ctx.auth.user.id,
+                    type: {
+                        in: types
+                    }
+                },
+                orderBy: {
+                    updatedAt: "desc"
+                },
+        })
+        }),
+
+    testPostgresConnection: protectedProcedure
+        .input(z.object({ credentialId: z.string() }))
+        .mutation(async ({ input, ctx }) => {
+            const credential = await prisma.credential.findFirst({
+                where: { id: input.credentialId, userId: ctx.auth.user.id }
+            });
+            if (!credential) throw new TRPCError({ code: "NOT_FOUND", message: "Credential not found" });
+            const config = JSON.parse(decrypt(credential.value)) as PostgresConnectionConfig;
+            const result = await testConnection(config);
+            if (!result.success) throw new TRPCError({ code: "BAD_REQUEST", message: result.error ?? "Connection failed" });
+            return { latencyMs: result.latencyMs, success: true };
+        }),
+
+    testGmailCredential: protectedProcedure
+        .input(z.object({ credentialId: z.string() }))
+        .mutation(async ({ input, ctx }) => {
+            const credential = await prisma.credential.findUnique({
+                where: { id: input.credentialId, userId: ctx.auth.user.id },
+            });
+            if (!credential) return { ok: false as const, error: "Credential not found" };
+            try {
+                const { token, email } = await refreshGmailAccessToken(credential.id, ctx.auth.user.id);
+                const profileRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/profile", {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                if (!profileRes.ok) return { ok: false as const, error: "Failed to fetch Gmail profile" };
+                const profile = (await profileRes.json()) as { emailAddress?: string };
+                return { ok: true as const, email: profile.emailAddress ?? email };
+            } catch (err) {
+                return { ok: false as const, error: err instanceof Error ? err.message : "Unknown error" };
+            }
         })
 });

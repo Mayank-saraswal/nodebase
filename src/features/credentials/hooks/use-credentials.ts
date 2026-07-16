@@ -130,3 +130,8 @@ export const useCredentialsByType = (type:CredentialType)=>{
     const trpc = useTRPC()
     return useQuery(trpc.credentials.getByType.queryOptions({type} ))
 }
+
+export const useCredentialsByTypes = (types: CredentialType[])=>{
+    const trpc = useTRPC()
+    return useQuery(trpc.credentials.getByTypes.queryOptions({types} ))
+}

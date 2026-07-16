@@ -7,6 +7,6 @@ import type { NodeExecutor } from "@/features/executions/types"
  * Inngest function when any node throws NonRetriableError.
  * No channel publishing needed here.
  */
-export const errorTriggerExecutor: NodeExecutor = async ({ context }) => {
+export const errorTriggerExecutor: NodeExecutor = async ({ data, context }) => {
   return context
 }

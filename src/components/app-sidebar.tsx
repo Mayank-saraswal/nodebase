@@ -5,8 +5,8 @@ import {
     HistoryIcon,
     KeyIcon,
     LogOutIcon,
-    StarIcon
-
+    StarIcon,
+    SparklesIcon
 } from "lucide-react"
 
 import Image from "next/image"
@@ -37,6 +37,11 @@ const menuItems = [
                 url: "/workflows",
 
 
+            },
+            {
+                title: "AI Agent",
+                icon: SparklesIcon,
+                url: "/ai-agent",
             },
             {
                 title: "Credentials",
