@@ -2,25 +2,37 @@
  * Shared LLM edge-case validation for Corsair chat-style adapters
  * (OpenAI, Gemini, DeepSeek, Perplexity).
  *
- * Enforces:
- * - Missing userPrompt / prompt / messagesJson
- * - Empty messagesJson array
- * - Invalid role / non-string content
- * - Invalid messages / params JSON shapes
- * - temperature outside 0–2
- * - top_p outside (0, 1]
- * - max_tokens ≤ 0
- * - stream=true rejected (workflow safety)
+ * Goals:
+ * - Full API potential (tool calling, multimodal content, extra fields)
+ * - Hard edges for invalid JSON, empty payloads, bad sampling ranges, stream
+ * - Per-provider message profiles via MessageValidationMode
  */
 
 import { NonRetriableError } from "inngest"
 
-export type ChatRole = "system" | "user" | "assistant"
+export type ChatRole = "system" | "user" | "assistant" | "tool" | "function"
 
-export type ChatMessage = {
+/** Minimal chat message; extra API fields preserved as Record */
+export type ChatMessage = Record<string, unknown> & {
   role: string
-  content: string
 }
+
+export type MessageValidationMode =
+  /** system | user | assistant; content must be string (Perplexity) */
+  | "strict-chat"
+  /**
+   * OpenAI Chat Completions full surface:
+   * roles system|user|assistant|tool|function
+   * content: string | array | null
+   * tool_calls, tool_call_id, name, etc. preserved
+   */
+  | "openai-chat"
+  /**
+   * DeepSeek chat: system|user|assistant|tool + string content + tool_calls
+   */
+  | "deepseek-chat"
+  /** Anthropic-style user|assistant only (system separate) */
+  | "anthropic-messages"
 
 export function parseJsonObject(
   raw: string,
@@ -70,6 +82,7 @@ export function optNum(value: string): number | undefined {
 
 /**
  * Validate sampling / token limits used by chat-style APIs.
+ * Only validates values that are present (undefined = skip).
  */
 export function assertSamplingParams(
   brand: string,
@@ -97,6 +110,7 @@ export function assertSamplingParams(
 
 /**
  * Reject streaming in workflow executors (non-streaming path only).
+ * Full ops remain available; streaming is unsafe/unsupported in step runners.
  */
 export function assertNoStream(
   brand: string,
@@ -110,17 +124,42 @@ export function assertNoStream(
   }
 }
 
-const DEFAULT_ROLES: readonly ChatRole[] = ["system", "user", "assistant"]
+const ROLE_SETS: Record<MessageValidationMode, readonly string[]> = {
+  "strict-chat": ["system", "user", "assistant"],
+  "openai-chat": ["system", "user", "assistant", "tool", "function"],
+  "deepseek-chat": ["system", "user", "assistant", "tool"],
+  "anthropic-messages": ["user", "assistant"],
+}
+
+function isValidContent(
+  content: unknown,
+  mode: MessageValidationMode,
+): boolean {
+  if (mode === "strict-chat") {
+    return typeof content === "string"
+  }
+  // openai / deepseek: string, array (multimodal), null, or omitted when tool_calls present
+  if (content === undefined || content === null) return true
+  if (typeof content === "string") return true
+  if (Array.isArray(content)) return true
+  return false
+}
 
 /**
  * Parse and validate chat messages from messagesJson.
  * Returns undefined when messagesJson is empty (caller builds from prompts).
+ * Preserves full message objects (tool_calls, tool_call_id, name, …).
  */
 export function parseValidatedMessages(
   messagesJson: string,
   brand: string,
-  allowedRoles: readonly string[] = DEFAULT_ROLES,
+  mode: MessageValidationMode | readonly string[] = "strict-chat",
 ): ChatMessage[] | undefined {
+  const resolvedMode: MessageValidationMode =
+    typeof mode === "string" ? mode : "strict-chat"
+  const allowedRoles =
+    typeof mode === "string" ? ROLE_SETS[mode] : mode
+
   const fromJson = parseJsonArray(messagesJson, "messagesJson", brand)
   if (!fromJson) return undefined
 
@@ -135,12 +174,11 @@ export function parseValidatedMessages(
     const item = fromJson[i]
     if (item === null || typeof item !== "object" || Array.isArray(item)) {
       throw new NonRetriableError(
-        `${brand} messagesJson[${i}] must be an object with role and content.`,
+        `${brand} messagesJson[${i}] must be an object with role (and content when required).`,
       )
     }
-    const rec = item as Record<string, unknown>
+    const rec = { ...(item as Record<string, unknown>) }
     const role = rec.role
-    const content = rec.content
     if (typeof role !== "string" || !role.trim()) {
       throw new NonRetriableError(
         `${brand} messagesJson[${i}].role must be a non-empty string.`,
@@ -151,18 +189,64 @@ export function parseValidatedMessages(
         `${brand} messagesJson[${i}].role must be one of: ${allowedRoles.join(", ")}.`,
       )
     }
-    if (typeof content !== "string") {
+
+    // tool role requires tool_call_id for OpenAI/DeepSeek tool loops
+    if (
+      (resolvedMode === "openai-chat" || resolvedMode === "deepseek-chat") &&
+      role === "tool"
+    ) {
+      if (
+        rec.tool_call_id !== undefined &&
+        typeof rec.tool_call_id !== "string"
+      ) {
+        throw new NonRetriableError(
+          `${brand} messagesJson[${i}].tool_call_id must be a string when present.`,
+        )
+      }
+    }
+
+    // assistant tool_calls must be array when present
+    if (rec.tool_calls !== undefined && !Array.isArray(rec.tool_calls)) {
+      throw new NonRetriableError(
+        `${brand} messagesJson[${i}].tool_calls must be an array when present.`,
+      )
+    }
+
+    if (!isValidContent(rec.content, resolvedMode)) {
+      throw new NonRetriableError(
+        resolvedMode === "strict-chat"
+          ? `${brand} messagesJson[${i}].content must be a string.`
+          : `${brand} messagesJson[${i}].content must be a string, array, null, or omitted.`,
+      )
+    }
+
+    // strict: content required as string
+    if (resolvedMode === "strict-chat" && typeof rec.content !== "string") {
       throw new NonRetriableError(
         `${brand} messagesJson[${i}].content must be a string.`,
       )
     }
-    out.push({ role, content })
+
+    // openai tool message: content should still be string (tool result)
+    if (
+      (resolvedMode === "openai-chat" || resolvedMode === "deepseek-chat") &&
+      role === "tool" &&
+      rec.content !== undefined &&
+      typeof rec.content !== "string"
+    ) {
+      throw new NonRetriableError(
+        `${brand} messagesJson[${i}].content for role=tool must be a string.`,
+      )
+    }
+
+    out.push(rec as ChatMessage)
   }
   return out
 }
 
 /**
- * Build OpenAI-style messages from messagesJson or prompt fields.
+ * Build chat messages from messagesJson or prompt fields.
+ * mode defaults to strict-chat; pass "openai-chat" for full tool-calling support.
  */
 export function buildChatMessages(opts: {
   brand: string
@@ -170,14 +254,21 @@ export function buildChatMessages(opts: {
   userPrompt: string
   prompt: string
   systemPrompt?: string
-  /** Also accept `input` as user text (OpenAI convenience) */
   input?: string
+  mode?: MessageValidationMode
+  /** @deprecated use mode — still accepted as role list */
   allowedRoles?: readonly string[]
 }): ChatMessage[] {
+  const mode =
+    opts.mode ??
+    (opts.allowedRoles
+      ? undefined
+      : ("strict-chat" as MessageValidationMode))
+
   const fromJson = parseValidatedMessages(
     opts.messagesJson,
     opts.brand,
-    opts.allowedRoles,
+    mode ?? opts.allowedRoles ?? "strict-chat",
   )
   if (fromJson) return fromJson
 
@@ -199,7 +290,8 @@ export function buildChatMessages(opts: {
 }
 
 /**
- * Gemini contents: role is user|model, parts[].text required when using JSON.
+ * Gemini contents: role is user|model, parts array required.
+ * Supports text parts and inlineData (multimodal full potential).
  */
 export function parseGeminiContents(
   contentsJson: string,
@@ -232,9 +324,9 @@ export function parseGeminiContents(
         )
       }
     }
-    if (!Array.isArray(rec.parts)) {
+    if (!Array.isArray(rec.parts) || rec.parts.length === 0) {
       throw new NonRetriableError(
-        `${brand} contentsJson[${i}].parts must be an array.`,
+        `${brand} contentsJson[${i}].parts must be a non-empty array.`,
       )
     }
     for (let j = 0; j < rec.parts.length; j++) {
@@ -250,6 +342,23 @@ export function parseGeminiContents(
           `${brand} contentsJson[${i}].parts[${j}].text must be a string.`,
         )
       }
+      if (p.inlineData !== undefined) {
+        if (
+          p.inlineData === null ||
+          typeof p.inlineData !== "object" ||
+          Array.isArray(p.inlineData)
+        ) {
+          throw new NonRetriableError(
+            `${brand} contentsJson[${i}].parts[${j}].inlineData must be an object.`,
+          )
+        }
+        const id = p.inlineData as Record<string, unknown>
+        if (typeof id.mimeType !== "string" || typeof id.data !== "string") {
+          throw new NonRetriableError(
+            `${brand} contentsJson[${i}].parts[${j}].inlineData requires mimeType and data strings.`,
+          )
+        }
+      }
     }
   }
   return fromJson
@@ -261,8 +370,6 @@ export function requireClientSurface(
   detail: string,
 ): void {
   if (!ok) {
-    throw new NonRetriableError(
-      `${brand} Corsair: ${detail}`,
-    )
+    throw new NonRetriableError(`${brand} Corsair: ${detail}`)
   }
 }

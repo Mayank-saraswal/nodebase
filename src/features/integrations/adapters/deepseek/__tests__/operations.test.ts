@@ -130,6 +130,46 @@ describe("runDeepseekOperation (full Corsair surface + edges)", () => {
     ).rejects.toThrow(/at least one message/)
   })
 
+  it("supports tool role messages for chat completions", async () => {
+    await runDeepseekOperation(
+      client,
+      fields({
+        userPrompt: "",
+        messagesJson: JSON.stringify([
+          { role: "user", content: "hi" },
+          {
+            role: "assistant",
+            content: null,
+            tool_calls: [
+              {
+                id: "call_1",
+                type: "function",
+                function: { name: "fn", arguments: "{}" },
+              },
+            ],
+          },
+          { role: "tool", tool_call_id: "call_1", content: "result" },
+        ]),
+        paramsJson: JSON.stringify({
+          tools: [
+            {
+              type: "function",
+              function: { name: "fn", parameters: {} },
+            },
+          ],
+        }),
+      }),
+    )
+    expect(client.deepseek.api.chat.createCompletion).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tools: expect.any(Array),
+        messages: expect.arrayContaining([
+          expect.objectContaining({ role: "tool" }),
+        ]),
+      }),
+    )
+  })
+
   it("rejects invalid message role", async () => {
     await expect(
       runDeepseekOperation(
@@ -142,18 +182,18 @@ describe("runDeepseekOperation (full Corsair surface + edges)", () => {
     ).rejects.toThrow(/role/)
   })
 
-  it("rejects non-string message content", async () => {
+  it("rejects invalid content type for tool role", async () => {
     await expect(
       runDeepseekOperation(
         client,
         fields({
           userPrompt: "",
           messagesJson: JSON.stringify([
-            { role: "user", content: { nested: true } },
+            { role: "tool", content: { nested: true } },
           ]),
         }),
       ),
-    ).rejects.toThrow(/content must be a string/)
+    ).rejects.toThrow(/content/)
   })
 
   it("rejects stream=true", async () => {

@@ -121,12 +121,14 @@ export async function runPerplexityOperation(
       if (!model) {
         throw new NonRetriableError("Perplexity CHAT: model is required.")
       }
+      // Package schema: role system|user|assistant, content string only
       const messages = buildChatMessages({
         brand: "Perplexity CHAT",
         messagesJson: fields.messagesJson,
         userPrompt: fields.userPrompt,
         prompt: fields.prompt,
         systemPrompt: fields.systemPrompt,
+        mode: "strict-chat",
       })
       const max_tokens = optNum(fields.maxTokens)
       const temperature = optNum(fields.temperature)

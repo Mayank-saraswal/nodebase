@@ -96,11 +96,12 @@ function resolveModel(
 /** Anthropic path only allows user|assistant in messages (system is separate). */
 function buildAnthropicMessages(
   fields: ResolvedDeepseekFields,
-): Array<{ role: string; content: string }> {
-  const fromJson = parseValidatedMessages(fields.messagesJson, "DeepSeek", [
-    "user",
-    "assistant",
-  ])
+): Array<Record<string, unknown>> {
+  const fromJson = parseValidatedMessages(
+    fields.messagesJson,
+    "DeepSeek",
+    "anthropic-messages",
+  )
   if (fromJson) return fromJson
   const user = fields.userPrompt.trim() || fields.prompt.trim()
   if (!user) {
@@ -147,13 +148,15 @@ export async function runDeepseekOperation(
         userPrompt: fields.userPrompt,
         prompt: fields.prompt,
         systemPrompt: fields.systemPrompt,
-        // Align with shared chat edges: system | user | assistant
+        // Full chat potential: system|user|assistant|tool + tools via paramsJson
+        mode: "deepseek-chat",
       })
       const data = await api.chat.createCompletion({
         model,
         messages,
         temperature,
         maxTokens,
+        // tools / toolChoice pass through paramsJson
         ...extra,
         stream: undefined,
       })

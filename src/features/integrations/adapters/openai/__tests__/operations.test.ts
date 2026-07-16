@@ -121,19 +121,66 @@ describe("runOpenAIOperation (full Corsair surface + edges)", () => {
     ).rejects.toThrow(/at least one message/)
   })
 
+  it("supports tool calling message roles (assistant tool_calls + tool)", async () => {
+    await runOpenAIOperation(
+      client,
+      fields({
+        userPrompt: "",
+        messagesJson: JSON.stringify([
+          { role: "user", content: "weather?" },
+          {
+            role: "assistant",
+            content: null,
+            tool_calls: [
+              {
+                id: "call_1",
+                type: "function",
+                function: { name: "get_weather", arguments: "{}" },
+              },
+            ],
+          },
+          {
+            role: "tool",
+            tool_call_id: "call_1",
+            content: '{"temp":72}',
+          },
+        ]),
+        paramsJson: JSON.stringify({
+          tools: [
+            {
+              type: "function",
+              function: { name: "get_weather", parameters: {} },
+            },
+          ],
+        }),
+      }),
+    )
+    expect(
+      (client.openai.api.chat as Record<string, ReturnType<typeof vi.fn>>)
+        .createCompletion,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tools: expect.any(Array),
+        messages: expect.arrayContaining([
+          expect.objectContaining({ role: "tool", tool_call_id: "call_1" }),
+        ]),
+      }),
+    )
+  })
+
   it("rejects invalid message role", async () => {
     await expect(
       runOpenAIOperation(
         client,
         fields({
           userPrompt: "",
-          messagesJson: JSON.stringify([{ role: "tool", content: "x" }]),
+          messagesJson: JSON.stringify([{ role: "bogus", content: "x" }]),
         }),
       ),
     ).rejects.toThrow(/role/)
   })
 
-  it("rejects non-string message content", async () => {
+  it("rejects invalid content type (object that is not array)", async () => {
     await expect(
       runOpenAIOperation(
         client,
@@ -144,7 +191,7 @@ describe("runOpenAIOperation (full Corsair surface + edges)", () => {
           ]),
         }),
       ),
-    ).rejects.toThrow(/content must be a string/)
+    ).rejects.toThrow(/content/)
   })
 
   it("rejects invalid paramsJson", async () => {

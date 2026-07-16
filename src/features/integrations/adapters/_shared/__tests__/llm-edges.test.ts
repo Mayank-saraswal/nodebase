@@ -16,22 +16,66 @@ describe("llm-edges shared validators", () => {
     expect(parseJsonObject('{"a":1}', "paramsJson", "X")).toEqual({ a: 1 })
   })
 
-  it("parseValidatedMessages enforces empty / role / content", () => {
-    expect(() => parseValidatedMessages("[]", "X")).toThrow(
+  it("strict-chat rejects tool role and non-string content", () => {
+    expect(() => parseValidatedMessages("[]", "X", "strict-chat")).toThrow(
       /at least one message/,
     )
     expect(() =>
       parseValidatedMessages(
         JSON.stringify([{ role: "tool", content: "x" }]),
         "X",
+        "strict-chat",
       ),
     ).toThrow(/role/)
     expect(() =>
       parseValidatedMessages(
         JSON.stringify([{ role: "user", content: 1 }]),
         "X",
+        "strict-chat",
       ),
     ).toThrow(/content must be a string/)
+  })
+
+  it("openai-chat allows tool calling full message shapes", () => {
+    const msgs = parseValidatedMessages(
+      JSON.stringify([
+        { role: "user", content: "hi" },
+        {
+          role: "assistant",
+          content: null,
+          tool_calls: [
+            {
+              id: "c1",
+              type: "function",
+              function: { name: "fn", arguments: "{}" },
+            },
+          ],
+        },
+        { role: "tool", tool_call_id: "c1", content: "ok" },
+      ]),
+      "OpenAI",
+      "openai-chat",
+    )
+    expect(msgs).toHaveLength(3)
+    expect(msgs?.[1].tool_calls).toBeDefined()
+    expect(msgs?.[2].role).toBe("tool")
+  })
+
+  it("openai-chat allows multimodal content arrays", () => {
+    const msgs = parseValidatedMessages(
+      JSON.stringify([
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "see" },
+            { type: "image_url", image_url: { url: "https://x" } },
+          ],
+        },
+      ]),
+      "OpenAI",
+      "openai-chat",
+    )
+    expect(Array.isArray(msgs?.[0].content)).toBe(true)
   })
 
   it("buildChatMessages requires prompt fields", () => {

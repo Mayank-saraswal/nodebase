@@ -127,7 +127,7 @@ function buildArgs(
     topP: typeof extra.top_p === "number" ? extra.top_p : undefined,
   })
 
-  // chat completions
+  // chat completions — full potential: tools via paramsJson, tool role messages, multimodal content
   if (key === "chat.createCompletion") {
     const messages = buildChatMessages({
       brand: "OpenAI CHAT",
@@ -136,12 +136,14 @@ function buildArgs(
       prompt: fields.prompt,
       systemPrompt: fields.systemPrompt,
       input: fields.input,
+      mode: "openai-chat",
     })
     return {
       model,
       messages,
       temperature,
       max_tokens: maxTokens,
+      // tools, tool_choice, response_format, etc. pass through paramsJson (extra)
       ...extra,
       stream: undefined,
     }
@@ -312,6 +314,7 @@ function buildArgs(
       prompt: fields.prompt,
       systemPrompt: fields.systemPrompt,
       input: fields.input,
+      mode: "openai-chat",
     })
   }
 
