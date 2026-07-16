@@ -34,8 +34,11 @@ const operationLabels: Record<string, string> = {
   ARCHIVE_PAGE: "Archive Page",
   APPEND_BLOCK: "Append Block",
   GET_BLOCK_CHILDREN: "Get Block Children",
-  SEARCH: "Search",
+  SEARCH: "Search Pages",
   GET_DATABASE: "Get Database",
+  LIST_DATABASES: "List Databases",
+  SEARCH_DATABASE: "Search Database",
+  CREATE_PAGE: "Create Page",
   GET_USER: "Get User",
   GET_USERS: "List Users",
 }

@@ -5,6 +5,7 @@ import { googlesheets } from "@corsair-dev/googlesheets"
 import { googledrive } from "@corsair-dev/googledrive"
 import { slack } from "@corsair-dev/slack"
 import { github } from "@corsair-dev/github"
+import { notion } from "@corsair-dev/notion"
 import { getCorsairPool } from "./pool"
 import {
   getAppUrl,
@@ -55,6 +56,9 @@ function buildCorsair() {
         permissions: { mode: "open" },
       }),
       github({
+        permissions: { mode: "open" },
+      }),
+      notion({
         permissions: { mode: "open" },
       }),
     ],

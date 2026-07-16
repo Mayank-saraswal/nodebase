@@ -36,6 +36,7 @@ import { googleSheetsAdapter } from "@/features/integrations/adapters/google-she
 import { googleDriveAdapter } from "@/features/integrations/adapters/google-drive/adapter"
 import { slackAdapter } from "@/features/integrations/adapters/slack/adapter"
 import { githubAdapter } from "@/features/integrations/adapters/github/adapter"
+import { notionAdapter } from "@/features/integrations/adapters/notion/adapter"
 
 /** Adapter map keyed by Corsair plugin id */
 const ADAPTERS: Partial<Record<CorsairPluginId, IntegrationAdapter>> = {
@@ -44,6 +45,7 @@ const ADAPTERS: Partial<Record<CorsairPluginId, IntegrationAdapter>> = {
   googledrive: googleDriveAdapter,
   slack: slackAdapter,
   github: githubAdapter,
+  notion: notionAdapter,
 }
 
 export type RunIntegrationParams = {

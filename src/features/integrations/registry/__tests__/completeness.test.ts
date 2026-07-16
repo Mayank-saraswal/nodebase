@@ -11,6 +11,7 @@ import {
   googleDriveIntegrationDefinition,
   slackIntegrationDefinition,
   githubIntegrationDefinition,
+  notionIntegrationDefinition,
   buildAliasMap,
   listOperationKeys,
 } from "../index"
@@ -239,5 +240,33 @@ describe("Option C registry completeness", () => {
     const map = buildAliasMap(githubIntegrationDefinition)
     expect(map.get("ISSUE_LIST")).toBe("issues.list")
     expect(map.get("USER_GET_CURRENT")).toBe("users.getAuthenticated")
+  })
+
+  it("Notion registry covers all Corsair endpoints", () => {
+    const keys = listOperationKeys(notionIntegrationDefinition)
+    const required = [
+      "databases.getDatabase",
+      "databases.getManyDatabases",
+      "databases.searchDatabase",
+      "databasePages.createDatabasePage",
+      "databasePages.getDatabasePage",
+      "databasePages.getManyDatabasePages",
+      "databasePages.updateDatabasePage",
+      "pages.archivePage",
+      "pages.createPage",
+      "pages.searchPage",
+      "blocks.appendBlock",
+      "blocks.getManyChildBlocks",
+      "users.getUser",
+      "users.getManyUsers",
+    ]
+    expect(corsairKeysCovered(keys, required)).toEqual([])
+  })
+
+  it("Notion aliases resolve QUERY_DATABASE", () => {
+    const map = buildAliasMap(notionIntegrationDefinition)
+    expect(map.get("QUERY_DATABASE")).toBe(
+      "databasePages.getManyDatabasePages",
+    )
   })
 })
