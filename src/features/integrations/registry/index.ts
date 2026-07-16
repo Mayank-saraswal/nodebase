@@ -7,6 +7,7 @@ import { slackIntegrationDefinition } from "./integrations/slack"
 import { githubIntegrationDefinition } from "./integrations/github"
 import { notionIntegrationDefinition } from "./integrations/notion"
 import { hubspotIntegrationDefinition } from "./integrations/hubspot"
+import { telegramIntegrationDefinition } from "./integrations/telegram"
 import { resolveOperation, buildAliasMap, listOperationKeys } from "./resolve"
 import type { IntegrationDefinition } from "./types"
 
@@ -29,6 +30,7 @@ const BY_TYPE_KEY: Record<string, IntegrationDefinition> = {
   github: githubIntegrationDefinition,
   notion: notionIntegrationDefinition,
   hubspot: hubspotIntegrationDefinition,
+  telegram: telegramIntegrationDefinition,
 }
 
 /** Map Prisma NodeType → registry typeKey */
@@ -125,4 +127,5 @@ export {
   githubIntegrationDefinition,
   notionIntegrationDefinition,
   hubspotIntegrationDefinition,
+  telegramIntegrationDefinition,
 }

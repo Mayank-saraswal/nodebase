@@ -13,6 +13,7 @@ import {
   githubIntegrationDefinition,
   notionIntegrationDefinition,
   hubspotIntegrationDefinition,
+  telegramIntegrationDefinition,
   buildAliasMap,
   listOperationKeys,
 } from "../index"
@@ -269,6 +270,37 @@ describe("Option C registry completeness", () => {
     expect(map.get("QUERY_DATABASE")).toBe(
       "databasePages.getManyDatabasePages",
     )
+  })
+
+  it("Telegram registry covers all Corsair endpoints", () => {
+    const keys = listOperationKeys(telegramIntegrationDefinition)
+    const required = [
+      "messages.sendMessage",
+      "messages.editMessageText",
+      "messages.deleteMessage",
+      "messages.pinChatMessage",
+      "messages.unpinChatMessage",
+      "messages.sendPhoto",
+      "messages.sendVideo",
+      "messages.sendAudio",
+      "messages.sendDocument",
+      "messages.sendSticker",
+      "messages.sendAnimation",
+      "messages.sendLocation",
+      "messages.sendMediaGroup",
+      "messages.sendChatAction",
+      "chat.getChat",
+      "chat.getChatAdministrators",
+      "chat.getChatMember",
+      "callback.answerCallbackQuery",
+      "callback.answerInlineQuery",
+      "file.getFile",
+      "me.getMe",
+      "updates.getUpdates",
+      "webhook.setWebhook",
+      "webhook.deleteWebhook",
+    ]
+    expect(corsairKeysCovered(keys, required)).toEqual([])
   })
 
   it("HubSpot registry covers all Corsair endpoints", () => {
