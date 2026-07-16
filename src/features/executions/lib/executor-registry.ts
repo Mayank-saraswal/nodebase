@@ -42,7 +42,8 @@ import { postgresExecutor } from "../components/postgres/executor";
 import { githubExecutor } from "../components/github/executor";
 import { githubTriggerExecutor } from "@/features/triggers/components/github-trigger/executor";
 
-export const executorRegistry: Record<NodeType, NodeExecutor> = {
+// Cast: specialized NodeExecutor<TData> is assignable at runtime; TS variance is invariant on params
+export const executorRegistry = {
     [NodeType.MANUAL_TRIGGER]: manualTriggerExecutor,
     [NodeType.HTTP_REQUEST]: httpRequestExecutor,
     [NodeType.INITIAL]: manualTriggerExecutor,
@@ -92,7 +93,7 @@ export const executorRegistry: Record<NodeType, NodeExecutor> = {
     [NodeType.POSTGRES]: postgresExecutor,
     [NodeType.GITHUB]: githubExecutor,
     [NodeType.GITHUB_TRIGGER]: githubTriggerExecutor,
-}
+} as Record<NodeType, NodeExecutor>
 
 export const getExecutor = (type: NodeType): NodeExecutor => {
     const executor = executorRegistry[type]
@@ -100,6 +101,5 @@ export const getExecutor = (type: NodeType): NodeExecutor => {
         throw new Error(`No executor found for node type:${type}`)
     }
 
-    return executor;
-
-};
+    return executor
+}

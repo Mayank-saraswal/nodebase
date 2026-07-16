@@ -3,6 +3,7 @@ import { createCorsair } from "corsair"
 import { gmail } from "@corsair-dev/gmail"
 import { googlesheets } from "@corsair-dev/googlesheets"
 import { googledrive } from "@corsair-dev/googledrive"
+import { slack } from "@corsair-dev/slack"
 import { getCorsairPool } from "./pool"
 import {
   getAppUrl,
@@ -47,6 +48,9 @@ function buildCorsair() {
         permissions: { mode: "open" },
       }),
       googledrive({
+        permissions: { mode: "open" },
+      }),
+      slack({
         permissions: { mode: "open" },
       }),
     ],

@@ -1,5 +1,10 @@
 import { NonRetriableError, RetryAfterError } from "inngest"
-import type { NodeExecutor } from "@/features/executions/types"
+import type { NodeExecutor, WorkflowContext } from "@/features/executions/types"
+import {
+  asBoolean,
+  asString,
+  type GmailData as TypedGmailData,
+} from "@/features/executions/types"
 import prisma from "@/lib/db"
 import { resolveTemplate } from "@/features/executions/lib/template-resolver"
 import { gmailChannel } from "@/inngest/channels/gmail"
@@ -15,7 +20,7 @@ import { NodeType } from "@/generated/prisma"
 
 /* ── Types ── */
 
-type GmailData = { nodeId?: string }
+type GmailData = TypedGmailData & { nodeId?: string }
 
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me"
 
@@ -252,25 +257,33 @@ function buildRawMessage(opts: {
 
 /* ── Executor ── */
 
-export const gmailExecutor: NodeExecutor<GmailData> = async ({ data, nodeId,
+export const gmailExecutor: NodeExecutor<GmailData> = async ({
+  data,
+  nodeId,
   context,
   step,
   publish,
   userId,
   tenantId: tenantIdParam,
-}) => {
+}): Promise<WorkflowContext> => {
   await publish(gmailChannel().status({ nodeId, status: "loading" }))
 
   // Step 1: Load config
   // unknown boundary: node.data is JSON from DB/editor
   const config = (data ?? {}) as Record<string, unknown>
 
-if (!config || Object.keys(config).length === 0) {
+  if (!config || Object.keys(config).length === 0) {
     await publish(gmailChannel().status({ nodeId, status: "error" }))
     throw new NonRetriableError(
-      "Gmail node not configured. Open settings to configure."
+      "Gmail node not configured. Open settings to configure.",
     )
   }
+
+  const credentialId = asString(config.credentialId)
+  const variableName = asString(config.variableName, "gmail")
+  const includeBody = asBoolean(config.includeBody)
+  const includeHeaders = asBoolean(config.includeHeaders)
+  const isHtml = asBoolean(config.isHtml)
 
   // ── Corsair backbone path (Option C generic runner + multi-tenant) ──
   {
@@ -313,13 +326,13 @@ if (!config || Object.keys(config).length === 0) {
   const tokenResult = await step.run(
     `gmail-${nodeId}-get-tokens`,
     async () => {
-      if (!config.credentialId) {
+      if (!credentialId) {
         throw new NonRetriableError(
-          "Gmail: No credential selected in node config."
+          "Gmail: No credential selected in node config.",
         )
       }
-      return getAccessToken(config.credentialId, userId)
-    }
+      return getAccessToken(credentialId, userId)
+    },
   )
 
   const accessToken = tokenResult.token
@@ -346,7 +359,8 @@ if (!config || Object.keys(config).length === 0) {
 
       let apiResult: Record<string, unknown> = {}
 
-      switch (config.operation) {
+      const operation = asString(config.operation, "SEND")
+      switch (operation) {
         /* ── SEND ── */
         case GmailOperation.SEND: {
           if (!to.trim()) {
@@ -363,17 +377,17 @@ if (!config || Object.keys(config).length === 0) {
             try {
               const uploadResult = await uploadFromBase64(
                 attachmentData,
-                config.attachmentMime || "application/octet-stream",
+                asString(config.attachmentMime, "application/octet-stream"),
                 {
                   userId,
-                  workflowId: config.workflowId,
-                  executionId: (context.__executionId as string) ?? undefined,
+                  workflowId: asString(config.workflowId, "workflow"),
+                  executionId: asString(context.__executionId, "execution"),
                   filename: attachmentName || "attachment",
-                }
+                },
               )
               const sizeKb = (uploadResult.sizeBytes / 1024).toFixed(0)
               const displayName = attachmentName || "attachment"
-              const downloadLink = config.isHtml
+              const downloadLink = isHtml
                 ? `<p><a href="${uploadResult.publicUrl}" download="${displayName}">` +
                   `\uD83D\uDCCE Download ${displayName} (${sizeKb}KB)</a></p>`
                 : `\n\nDownload ${displayName} (${sizeKb}KB): ${uploadResult.publicUrl}`
@@ -389,7 +403,7 @@ if (!config || Object.keys(config).length === 0) {
             to,
             subject,
             body: finalBody,
-            isHtml: config.isHtml,
+            isHtml: isHtml,
             cc,
             bcc,
             replyTo,
@@ -461,7 +475,7 @@ if (!config || Object.keys(config).length === 0) {
             to: replyRecipient,
             subject: replySubject,
             body,
-            isHtml: config.isHtml,
+            isHtml: isHtml,
             cc,
             bcc,
             inReplyTo: origMessageId,
@@ -524,7 +538,7 @@ if (!config || Object.keys(config).length === 0) {
           const { text: origText, html: origHtml } = extractBodyFromPayload(payload)
 
           let fwdBody: string
-          if (config.isHtml) {
+          if (isHtml) {
             const noteHtml = body ? `<div>${escapeHtml(body)}</div>` : ""
             const contentHtml = origHtml || escapeHtml(origText).replace(/\n/g, "<br>")
             fwdBody = `${noteHtml}<div style="border-left:2px solid #ccc;padding-left:12px"><p><b>From:</b> ${escapeHtml(origFrom)}<br><b>Date:</b> ${escapeHtml(origDate)}<br><b>Subject:</b> ${escapeHtml(origSubject)}</p><div>${contentHtml}</div></div>`
@@ -538,7 +552,7 @@ if (!config || Object.keys(config).length === 0) {
             to,
             subject: fwdSubject,
             body: fwdBody,
-            isHtml: config.isHtml,
+            isHtml: isHtml,
             cc,
             bcc,
             replyTo,
@@ -569,9 +583,9 @@ if (!config || Object.keys(config).length === 0) {
           }
 
           let url: string
-          if (config.includeBody) {
+          if (includeBody) {
             url = `/messages/${messageId}?format=full`
-          } else if (config.includeHeaders) {
+          } else if (includeHeaders) {
             const metaHeaders = ["From", "To", "Subject", "Date", "Message-ID", "Reply-To", "Cc"]
             const params = new URLSearchParams({ format: "metadata" })
             for (const h of metaHeaders) params.append("metadataHeaders", h)
@@ -586,7 +600,7 @@ if (!config || Object.keys(config).length === 0) {
           const getMsgHdr = (name: string) =>
             getMsgHeaders.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value ?? ""
 
-          const { text: getMsgBodyText } = config.includeBody
+          const { text: getMsgBodyText } = includeBody
             ? extractBodyFromPayload(getMsgPayload)
             : { text: "" }
 
@@ -604,7 +618,7 @@ if (!config || Object.keys(config).length === 0) {
             isUnread: ((msg.labelIds as string[]) ?? []).includes("UNREAD"),
             isStarred: ((msg.labelIds as string[]) ?? []).includes("STARRED"),
             attachmentCount: getMsgAttachmentCount,
-            ...(config.includeBody ? { bodyText: getMsgBodyText } : {}),
+            ...(includeBody ? { bodyText: getMsgBodyText } : {}),
           }
           break
         }
@@ -632,7 +646,7 @@ if (!config || Object.keys(config).length === 0) {
           // Fetch metadata for each message
           const messages = await Promise.all(
             rawMessages.map((m) =>
-              fetchMessageMetadata(m.id as string, accessToken, config.includeBody)
+              fetchMessageMetadata(m.id as string, accessToken, includeBody)
             )
           )
 
@@ -668,7 +682,7 @@ if (!config || Object.keys(config).length === 0) {
           // Fetch metadata for each message
           const messages = await Promise.all(
             rawMessages.map((m) =>
-              fetchMessageMetadata(m.id as string, accessToken, config.includeBody)
+              fetchMessageMetadata(m.id as string, accessToken, includeBody)
             )
           )
 
@@ -820,7 +834,7 @@ if (!config || Object.keys(config).length === 0) {
             to,
             subject,
             body,
-            isHtml: config.isHtml,
+            isHtml: isHtml,
             cc,
             bcc,
             replyTo,
@@ -892,7 +906,7 @@ if (!config || Object.keys(config).length === 0) {
           if (!threadId.trim()) {
             throw new NonRetriableError("Gmail GET_THREAD: threadId is required.")
           }
-          const threadFormat = config.includeBody ? "full" : "metadata"
+          const threadFormat = includeBody ? "full" : "metadata"
           const thread = await gmailRequest(
             "GET",
             `/threads/${threadId}?format=${threadFormat}`,
@@ -904,7 +918,7 @@ if (!config || Object.keys(config).length === 0) {
             const tHeaders = (tPayload?.headers ?? []) as Array<{ name: string; value: string }>
             const tHdr = (name: string) =>
               tHeaders.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value ?? ""
-            const { text: tBodyText } = config.includeBody
+            const { text: tBodyText } = includeBody
               ? extractBodyFromPayload(tPayload)
               : { text: "" }
             return {
@@ -916,7 +930,7 @@ if (!config || Object.keys(config).length === 0) {
               date: tHdr("Date"),
               snippet: tmsg.snippet,
               isUnread: ((tmsg.labelIds as string[]) ?? []).includes("UNREAD"),
-              ...(config.includeBody ? { bodyText: tBodyText } : {}),
+              ...(includeBody ? { bodyText: tBodyText } : {}),
             }
           })
           apiResult = {
@@ -1023,14 +1037,14 @@ if (!config || Object.keys(config).length === 0) {
 
         default:
           throw new NonRetriableError(
-            `Unknown Gmail operation: ${config.operation}`
+            `Unknown Gmail operation: ${operation}`,
           )
       }
 
       return {
         ...context,
-        [config.variableName || "gmail"]: {
-          operation: config.operation,
+        [variableName]: {
+          operation,
           ...apiResult,
           timestamp: new Date().toISOString(),
         },
@@ -1042,5 +1056,5 @@ if (!config || Object.keys(config).length === 0) {
   }
 
   await publish(gmailChannel().status({ nodeId, status: "success" }))
-  return result as Record<string, unknown>
+  return result
 }

@@ -3,7 +3,7 @@ import prisma from "@/lib/db";
 import { generateSlug } from "random-word-slugs"
 import { z } from 'zod'
 import { PAGINATION } from "@/config/constants";
-import { NodeType } from "@/generated/prisma";
+import { NodeType, Prisma } from "@/generated/prisma"
 import { Node, Edge } from "@xyflow/react"
 
 import { inngest } from "@/inngest/client";
@@ -140,8 +140,8 @@ export const workflowsRouter = createTRPCRouter({
                         name: node.type || "unknown",
                         type: (node.type as NodeType) || NodeType.INITIAL,
                         position: node.position,
-                        // Prisma Json: editor payload already validated as Record<string, unknown>
-                        data: node.data ?? {},
+                        // Prisma InputJsonValue: free-form editor JSON
+                        data: (node.data ?? {}) as Prisma.InputJsonValue,
                     })),
                 });
                 //create connections

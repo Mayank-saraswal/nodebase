@@ -22,10 +22,8 @@ import {
   mapCorsairError,
   type CorsairPluginId,
 } from "@/lib/corsair"
-import {
-  getIntegrationForNodeType,
-  type IntegrationDefinition,
-} from "@/features/integrations/registry"
+import { getIntegrationForNodeType } from "@/features/integrations/registry"
+import type { IntegrationDefinition } from "@/features/integrations/registry/types"
 import {
   extractOperation,
   extractVariableName,
@@ -36,12 +34,14 @@ import type { IntegrationAdapter } from "@/features/integrations/types"
 import { gmailAdapter } from "@/features/integrations/adapters/gmail/adapter"
 import { googleSheetsAdapter } from "@/features/integrations/adapters/google-sheets/adapter"
 import { googleDriveAdapter } from "@/features/integrations/adapters/google-drive/adapter"
+import { slackAdapter } from "@/features/integrations/adapters/slack/adapter"
 
 /** Adapter map keyed by Corsair plugin id */
 const ADAPTERS: Partial<Record<CorsairPluginId, IntegrationAdapter>> = {
   gmail: gmailAdapter,
   googlesheets: googleSheetsAdapter,
   googledrive: googleDriveAdapter,
+  slack: slackAdapter,
 }
 
 export type RunIntegrationParams = {

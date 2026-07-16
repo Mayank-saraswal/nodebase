@@ -3,6 +3,7 @@ import type { CorsairPluginId } from "@/lib/corsair/config"
 import { gmailIntegrationDefinition } from "./integrations/gmail"
 import { googleSheetsIntegrationDefinition } from "./integrations/google-sheets"
 import { googleDriveIntegrationDefinition } from "./integrations/google-drive"
+import { slackIntegrationDefinition } from "./integrations/slack"
 import { resolveOperation, buildAliasMap, listOperationKeys } from "./resolve"
 import type { IntegrationDefinition } from "./types"
 
@@ -21,6 +22,7 @@ const BY_TYPE_KEY: Record<string, IntegrationDefinition> = {
   gmail: gmailIntegrationDefinition,
   google_sheets: googleSheetsIntegrationDefinition,
   google_drive: googleDriveIntegrationDefinition,
+  slack: slackIntegrationDefinition,
 }
 
 /** Map Prisma NodeType → registry typeKey */
@@ -113,4 +115,5 @@ export {
   gmailIntegrationDefinition,
   googleSheetsIntegrationDefinition,
   googleDriveIntegrationDefinition,
+  slackIntegrationDefinition,
 }

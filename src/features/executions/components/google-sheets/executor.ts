@@ -1,5 +1,11 @@
 import { NonRetriableError, RetryAfterError } from "inngest"
-import type { NodeExecutor } from "@/features/executions/types"
+import type { NodeExecutor, WorkflowContext } from "@/features/executions/types"
+import {
+  asBoolean,
+  asNumber,
+  asString,
+  type GoogleSheetsData as TypedSheetsData,
+} from "@/features/executions/types"
 import prisma from "@/lib/db"
 import { resolveTemplate } from "@/features/executions/lib/template-resolver"
 import { googleSheetsChannel } from "@/inngest/channels/google-sheets"
@@ -76,26 +82,33 @@ function rowsToObjects(
 
 // ─── GoogleSheetsData ────────────────────────────────────────────────────────
 
-type GoogleSheetsData = {
-  nodeId?: string
-}
+type GoogleSheetsData = TypedSheetsData & { nodeId?: string }
 
 // ─── Main executor ───────────────────────────────────────────────────────────
 
-export const googleSheetsExecutor: NodeExecutor<GoogleSheetsData> = async ({ data, nodeId,
+export const googleSheetsExecutor: NodeExecutor<GoogleSheetsData> = async ({
+  data,
+  nodeId,
   context,
   step,
   publish,
   userId,
   tenantId: tenantIdParam,
-}) => {
+}): Promise<WorkflowContext> => {
   await publish(
-    googleSheetsChannel().status({ nodeId, status: "loading" })
+    googleSheetsChannel().status({ nodeId, status: "loading" }),
   )
 
   // Step 1: Load config
   // unknown boundary: node.data is JSON from DB/editor
   const config = (data ?? {}) as Record<string, unknown>
+  const credentialId = asString(config.credentialId)
+  const spreadsheetId = asString(config.spreadsheetId)
+  const varName = asString(config.variableName, "googleSheets")
+  const operation = asString(config.operation, "READ_ROWS")
+  const headerRow = asBoolean(config.headerRow)
+  const includeEmptyRows = asBoolean(config.includeEmptyRows)
+  const maxResults = asNumber(config.maxResults, 100)
 
   // ── Corsair backbone path (Option C generic runner) ──
   {
@@ -137,12 +150,12 @@ export const googleSheetsExecutor: NodeExecutor<GoogleSheetsData> = async ({ dat
     }
   }
 
-if (!config || !config.credentialId || !config.spreadsheetId) {
+  if (!credentialId || !spreadsheetId) {
     await publish(
-      googleSheetsChannel().status({ nodeId, status: "error" })
+      googleSheetsChannel().status({ nodeId, status: "error" }),
     )
     throw new NonRetriableError(
-      "Google Sheets node not configured. Open settings to configure."
+      "Google Sheets node not configured. Open settings to configure.",
     )
   }
 
@@ -152,27 +165,30 @@ if (!config || !config.credentialId || !config.spreadsheetId) {
     `google-sheets-${nodeId}-token`,
     async () => {
       try {
-        return await refreshGoogleSheetsAccessToken(config.credentialId!, userId)
+        return await refreshGoogleSheetsAccessToken(credentialId, userId)
       } catch (err) {
         await publish(googleSheetsChannel().status({ nodeId, status: "error" }))
         throw new NonRetriableError(
-          err instanceof Error ? err.message : "Google Sheets: Failed to get access token"
+          err instanceof Error
+            ? err.message
+            : "Google Sheets: Failed to get access token",
         )
       }
-    }
+    },
   )
 
-  const spreadsheetId = config.spreadsheetId
-  const sheetName = resolveTemplate(config.sheetName || "Sheet1", context)
-  const range = `${sheetName}!${config.range || "A:Z"}`
-  const varName = config.variableName || "googleSheets"
+  const sheetName = resolveTemplate(
+    asString(config.sheetName, "Sheet1"),
+    context,
+  )
+  const range = `${sheetName}!${asString(config.range, "A:Z")}`
 
   // Step 4: Execute operation
   try {
     const result = await step.run(
       `google-sheets-${nodeId}-execute`,
       async () => {
-        switch (config.operation) {
+        switch (operation) {
           // ── READ_ROWS ────────────────────────────────────────────
           case GoogleSheetsOp.READ_ROWS: {
             const data = await sheetsRequest(
@@ -183,9 +199,9 @@ if (!config || !config.credentialId || !config.spreadsheetId) {
             const rows = (data.values as string[][] | undefined) ?? []
             const items = rowsToObjects(
               rows,
-              config.headerRow,
-              config.includeEmptyRows,
-              config.maxResults
+              headerRow,
+              includeEmptyRows,
+              maxResults,
             )
             return {
               operation: "READ_ROWS",
@@ -198,8 +214,9 @@ if (!config || !config.credentialId || !config.spreadsheetId) {
           // ── APPEND_ROW ───────────────────────────────────────────
           case GoogleSheetsOp.APPEND_ROW: {
             let values: string[][]
-            if (config.rowValues && config.rowValues.trim()) {
-              const resolved = resolveTemplate(config.rowValues as string, context)
+            const rowValuesStr = asString(config.rowValues)
+            if (rowValuesStr.trim()) {
+              const resolved = resolveTemplate(rowValuesStr, context)
               let parsed: unknown
               try {
                 parsed = JSON.parse(resolved)
@@ -270,7 +287,7 @@ if (!config || !config.credentialId || !config.spreadsheetId) {
 
           // ── UPDATE_ROW ───────────────────────────────────────────
           case GoogleSheetsOp.UPDATE_ROW: {
-            const rowNum = resolveTemplate(config.rowNumber as string, context)
+            const rowNum = resolveTemplate(asString(config.rowNumber), context)
             if (!rowNum)
               throw new NonRetriableError(
                 "Google Sheets UPDATE_ROW: 'rowNumber' is required."
@@ -436,7 +453,7 @@ if (!config || !config.credentialId || !config.spreadsheetId) {
 
           // ── DELETE_ROW ───────────────────────────────────────────
           case GoogleSheetsOp.DELETE_ROW: {
-            const rowNum = resolveTemplate(config.rowNumber as string, context)
+            const rowNum = resolveTemplate(asString(config.rowNumber), context)
             if (!rowNum)
               throw new NonRetriableError(
                 "Google Sheets DELETE_ROW: 'rowNumber' is required."
@@ -487,7 +504,7 @@ if (!config || !config.credentialId || !config.spreadsheetId) {
 
           // ── GET_ROW_BY_NUMBER ──────────────────────────────────
           case GoogleSheetsOp.GET_ROW_BY_NUMBER: {
-            const rowNumber = resolveTemplate(config.rowNumber as string, context)
+            const rowNumber = resolveTemplate(asString(config.rowNumber), context)
             if (!rowNumber.trim())
               throw new NonRetriableError(
                 "Google Sheets GET_ROW_BY_NUMBER: rowNumber is required. " +
@@ -508,7 +525,7 @@ if (!config || !config.credentialId || !config.spreadsheetId) {
                   `?valueRenderOption=UNFORMATTED_VALUE`,
                 accessToken
               ),
-              config.headerRow
+              headerRow
                 ? sheetsRequest(
                     "GET",
                     `/${spreadsheetId}/values/` +
@@ -520,7 +537,7 @@ if (!config || !config.credentialId || !config.spreadsheetId) {
 
             const rowArr =
               ((rowData.values as string[][] | undefined) ?? [])[0] ?? []
-            const headers = config.headerRow
+            const headers = headerRow
               ? (((headerData.values as string[][] | undefined) ?? [])[0] ??
                   [])
               : rowArr.map((_, i) => String.fromCharCode(65 + i))
@@ -542,12 +559,12 @@ if (!config || !config.credentialId || !config.spreadsheetId) {
           // ── SEARCH_ROWS ─────────────────────────────────────────
           case GoogleSheetsOp.SEARCH_ROWS: {
             const searchColumn = resolveTemplate(
-              config.searchColumn,
-              context
+              asString(config.searchColumn),
+              context,
             )
             const searchValue = resolveTemplate(
-              config.searchValue,
-              context
+              asString(config.searchValue),
+              context,
             )
             if (!searchColumn.trim())
               throw new NonRetriableError(
@@ -581,13 +598,13 @@ if (!config || !config.credentialId || !config.spreadsheetId) {
               }
             }
 
-            const sHeaders = config.headerRow ? allValues[0] : []
-            const dataStart = config.headerRow ? 1 : 0
-            const searchColIdx = config.headerRow
+            const sHeaders = headerRow ? allValues[0] : []
+            const dataStart = headerRow ? 1 : 0
+            const searchColIdx = headerRow
               ? sHeaders.indexOf(searchColumn)
               : parseInt(searchColumn) - 1
 
-            if (config.headerRow && searchColIdx === -1) {
+            if (headerRow && searchColIdx === -1) {
               throw new NonRetriableError(
                 `Google Sheets SEARCH_ROWS: Column "${searchColumn}" not found. ` +
                   `Available columns: ${sHeaders.join(", ")}`
@@ -600,7 +617,7 @@ if (!config || !config.credentialId || !config.spreadsheetId) {
             for (
               let i = dataStart;
               i < allValues.length &&
-              matchedRows.length < config.maxResults;
+              matchedRows.length < maxResults;
               i++
             ) {
               const row = allValues[i]
@@ -608,7 +625,7 @@ if (!config || !config.credentialId || !config.spreadsheetId) {
                 String(row[searchColIdx] ?? "") ===
                 String(searchValue)
               ) {
-                if (config.headerRow) {
+                if (headerRow) {
                   const obj: Record<string, string> = {}
                   sHeaders.forEach((h, j) => {
                     obj[h] = row[j] ?? ""
@@ -638,14 +655,15 @@ if (!config || !config.credentialId || !config.spreadsheetId) {
 
           // ── CLEAR_RANGE ─────────────────────────────────────────
           case GoogleSheetsOp.CLEAR_RANGE: {
-            if (!config.clearRange?.trim()) {
+            const clearRangeRaw = asString(config.clearRange)
+            if (!clearRangeRaw.trim()) {
               throw new NonRetriableError(
                 "Google Sheets CLEAR_RANGE: range is required. " +
                 "Example: 'Sheet1!A2:Z' or 'Sheet1!A:A'. " +
                 "Open node settings and fill in the Range field."
               )
             }
-            const resolvedClear = resolveTemplate(config.clearRange as string, context)
+            const resolvedClear = resolveTemplate(clearRangeRaw, context)
             // If user already included the sheet name (contains "!"), use as-is
             // If not, prefix with sheetName
             const fullRange = resolvedClear.includes("!")
@@ -668,8 +686,8 @@ if (!config || !config.credentialId || !config.spreadsheetId) {
           // ── CREATE_SHEET ────────────────────────────────────────
           case GoogleSheetsOp.CREATE_SHEET: {
             const newSheetName = resolveTemplate(
-              config.newSheetName,
-              context
+              asString(config.newSheetName),
+              context,
             )
             if (!newSheetName.trim())
               throw new NonRetriableError(
@@ -746,14 +764,14 @@ if (!config || !config.credentialId || !config.spreadsheetId) {
 
           default:
             throw new NonRetriableError(
-              `Unknown Google Sheets operation: ${config.operation}`
+              `Unknown Google Sheets operation: ${operation}`,
             )
         }
-      }
+      },
     )
 
     await publish(
-      googleSheetsChannel().status({ nodeId, status: "success" })
+      googleSheetsChannel().status({ nodeId, status: "success" }),
     )
 
     return {

@@ -1,5 +1,6 @@
 import { NonRetriableError, RetryAfterError } from "inngest"
-import type { NodeExecutor } from "@/features/executions/types"
+import type { NodeExecutor, WorkflowContext } from "@/features/executions/types"
+import { asString } from "@/features/executions/types"
 import prisma from "@/lib/db"
 import { resolveTemplate } from "@/features/executions/lib/template-resolver"
 import { googleDriveChannel } from "@/inngest/channels/google-drive"
@@ -22,11 +23,13 @@ export const googleDriveExecutor: NodeExecutor = async ({
   publish,
   userId,
   tenantId: tenantIdParam,
-}) => {
+}): Promise<WorkflowContext> => {
   await publish(googleDriveChannel().status({ nodeId, status: "loading" }))
 
   // unknown: Node.data JSON boundary
   const config = (data ?? {}) as Record<string, unknown>
+  const credentialId = asString(config.credentialId)
+  const operation = asString(config.operation, "LIST_FILES")
 
   // ── Corsair backbone path (Option C generic runner) ──
   {
@@ -65,7 +68,7 @@ export const googleDriveExecutor: NodeExecutor = async ({
   }
 
   // ── Legacy path (Cryptr credentials + Drive REST) ──
-  if (!config?.credentialId) {
+  if (!credentialId) {
     await publish(googleDriveChannel().status({ nodeId, status: "error" }))
     throw new NonRetriableError("Google Drive node is missing credential")
   }
@@ -74,22 +77,27 @@ export const googleDriveExecutor: NodeExecutor = async ({
   const result = await step.run(`drive-${nodeId}-execute`, async () => {
     let token: string
     try {
-      token = await refreshGoogleDriveAccessToken(config.credentialId!, userId)
+      token = await refreshGoogleDriveAccessToken(credentialId, userId)
     } catch (err) {
       await publish(googleDriveChannel().status({ nodeId, status: "error" }))
       throw new NonRetriableError(
-        err instanceof Error ? err.message : "Google Drive: Failed to get access token"
+        err instanceof Error
+          ? err.message
+          : "Google Drive: Failed to get access token",
       )
     }
 
-    switch (config.operation) {
-
+    switch (operation) {
       case "UPLOAD_FILE": {
         // Get file content from context (previous node output)
-        const fileContent = (context as Record<string, unknown>).fileContent ??
-          ((context as Record<string, Record<string, unknown>>).body?.fileContent)
-        const fileName = resolveTemplate(config.fileName ?? "untitled", context)
-        const mimeType = config.mimeType ?? "application/octet-stream"
+        const fileContent =
+          context.fileContent ??
+          (context.body as Record<string, unknown> | undefined)?.fileContent
+        const fileName = resolveTemplate(
+          asString(config.fileName, "untitled"),
+          context,
+        )
+        const mimeType = asString(config.mimeType, "application/octet-stream")
 
         if (!fileContent) {
           throw new NonRetriableError(
@@ -100,7 +108,9 @@ export const googleDriveExecutor: NodeExecutor = async ({
         // Multipart upload
         const metadata = {
           name: fileName,
-          ...(config.folderId ? { parents: [config.folderId] } : {}),
+          ...(asString(config.folderId)
+            ? { parents: [asString(config.folderId)] }
+            : {}),
         }
 
         const boundary = "nodebase_boundary"
@@ -140,7 +150,7 @@ export const googleDriveExecutor: NodeExecutor = async ({
       }
 
       case "DOWNLOAD_FILE": {
-        const fileId = resolveTemplate(config.fileId ?? "", context)
+        const fileId = resolveTemplate(asString(config.fileId), context)
         if (!fileId) throw new NonRetriableError("DOWNLOAD_FILE requires a fileId")
 
         // Get file metadata first
@@ -171,9 +181,9 @@ export const googleDriveExecutor: NodeExecutor = async ({
 
       case "LIST_FILES": {
         const q = config.query
-          ? resolveTemplate(config.query as string, context)
-          : config.folderId
-            ? `'${config.folderId}' in parents and trashed=false`
+          ? resolveTemplate(asString(config.query), context)
+          : asString(config.folderId)
+            ? `'${asString(config.folderId)}' in parents and trashed=false`
             : "trashed=false"
 
         const params = new URLSearchParams({
@@ -199,7 +209,10 @@ export const googleDriveExecutor: NodeExecutor = async ({
       }
 
       case "CREATE_FOLDER": {
-        const folderName = resolveTemplate(config.fileName ?? "New Folder", context)
+        const folderName = resolveTemplate(
+          asString(config.fileName, "New Folder"),
+          context,
+        )
 
         const res = await fetch(`${DRIVE_API}/files`, {
           method: "POST",
@@ -210,7 +223,9 @@ export const googleDriveExecutor: NodeExecutor = async ({
           body: JSON.stringify({
             name: folderName,
             mimeType: "application/vnd.google-apps.folder",
-            ...(config.folderId ? { parents: [config.folderId] } : {}),
+            ...(asString(config.folderId)
+            ? { parents: [asString(config.folderId)] }
+            : {}),
           }),
         })
         const folder = await res.json()

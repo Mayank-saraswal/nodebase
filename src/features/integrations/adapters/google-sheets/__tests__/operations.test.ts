@@ -308,4 +308,67 @@ describe("runGoogleSheetsOperation (all ops)", () => {
       ),
     ).rejects.toThrow(/Unknown/)
   })
+
+  it("CREATE_SPREADSHEET does not require spreadsheetId", async () => {
+    vi.mocked(client.googlesheets.api.spreadsheets.create).mockResolvedValue({
+      spreadsheetId: "new-ss",
+      properties: { title: "Created" },
+    })
+    const out = await runGoogleSheetsOperation(
+      client,
+      fields({
+        operation: GoogleSheetsOp.CREATE_SPREADSHEET,
+        spreadsheetId: "",
+        newSheetName: "Created",
+      }),
+    )
+    expect(client.googlesheets.api.spreadsheets.create).toHaveBeenCalled()
+    expect(out.spreadsheetId).toBe("new-ss")
+  })
+
+  it("LIST_SPREADSHEETS", async () => {
+    vi.mocked(client.googlesheets.api.spreadsheets.list).mockResolvedValue({
+      files: [{ id: "ss1", name: "Sheet A" }],
+    })
+    const out = await runGoogleSheetsOperation(
+      client,
+      fields({
+        operation: GoogleSheetsOp.LIST_SPREADSHEETS,
+        spreadsheetId: "",
+      }),
+    )
+    expect(out.count).toBe(1)
+  })
+
+  it("APPEND_OR_UPDATE_ROW", async () => {
+    vi.mocked(client.googlesheets.api.sheets.appendOrUpdateRow).mockResolvedValue(
+      { updatedRange: "A2" },
+    )
+    const out = await runGoogleSheetsOperation(
+      client,
+      fields({
+        operation: GoogleSheetsOp.APPEND_OR_UPDATE_ROW,
+        matchColumn: "Email",
+        matchValue: "a@x.com",
+        rowValues: '["Ada","a@x.com"]',
+      }),
+    )
+    expect(client.googlesheets.api.sheets.appendOrUpdateRow).toHaveBeenCalled()
+    expect(out.operation).toBe("APPEND_OR_UPDATE_ROW")
+  })
+
+  it("DELETE_SHEET", async () => {
+    vi.mocked(client.googlesheets.api.sheets.deleteSheet).mockResolvedValue({})
+    const out = await runGoogleSheetsOperation(
+      client,
+      fields({
+        operation: GoogleSheetsOp.DELETE_SHEET,
+        sheetName: "Sheet1",
+      }),
+    )
+    expect(client.googlesheets.api.sheets.deleteSheet).toHaveBeenCalledWith(
+      expect.objectContaining({ spreadsheetId: "ss1", sheetId: 0 }),
+    )
+    expect(out.success).toBe(true)
+  })
 })

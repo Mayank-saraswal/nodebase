@@ -9,6 +9,7 @@ import {
   gmailIntegrationDefinition,
   googleSheetsIntegrationDefinition,
   googleDriveIntegrationDefinition,
+  slackIntegrationDefinition,
   buildAliasMap,
   listOperationKeys,
 } from "../index"
@@ -95,6 +96,46 @@ const DRIVE_CORSAIR_ENDPOINTS = [
   "search.filesAndFolders",
 ] as const
 
+/** Core Corsair Slack nested endpoints we ship (admin optional) */
+const SLACK_CORSAIR_ENDPOINTS = [
+  "messages.post",
+  "messages.update",
+  "messages.delete",
+  "messages.getPermalink",
+  "messages.search",
+  "channels.get",
+  "channels.list",
+  "channels.create",
+  "channels.archive",
+  "channels.unarchive",
+  "channels.invite",
+  "channels.kick",
+  "channels.setTopic",
+  "channels.setPurpose",
+  "channels.getHistory",
+  "channels.rename",
+  "channels.open",
+  "channels.close",
+  "channels.join",
+  "channels.leave",
+  "channels.getMembers",
+  "channels.getReplies",
+  "users.get",
+  "users.list",
+  "users.getProfile",
+  "users.getPresence",
+  "users.updateProfile",
+  "reactions.add",
+  "reactions.get",
+  "reactions.remove",
+  "files.get",
+  "files.list",
+  "files.upload",
+  "stars.add",
+  "stars.remove",
+  "stars.list",
+] as const
+
 function corsairKeysCovered(registryKeys: string[], required: readonly string[]) {
   const set = new Set(registryKeys)
   return required.filter((k) => !set.has(k))
@@ -136,5 +177,16 @@ describe("Option C registry completeness", () => {
   it("Google Drive registry covers all Corsair endpoints", () => {
     const keys = listOperationKeys(googleDriveIntegrationDefinition)
     expect(corsairKeysCovered(keys, DRIVE_CORSAIR_ENDPOINTS)).toEqual([])
+  })
+
+  it("Slack registry covers core Corsair endpoints", () => {
+    const keys = listOperationKeys(slackIntegrationDefinition)
+    expect(corsairKeysCovered(keys, SLACK_CORSAIR_ENDPOINTS)).toEqual([])
+  })
+
+  it("Slack aliases resolve MESSAGE_SEND → messages.post", () => {
+    const map = buildAliasMap(slackIntegrationDefinition)
+    expect(map.get("MESSAGE_SEND")).toBe("messages.post")
+    expect(map.get("CHANNEL_LIST")).toBe("channels.list")
   })
 })

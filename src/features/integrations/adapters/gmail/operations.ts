@@ -130,6 +130,43 @@ function asRecord(v: unknown): Record<string, unknown> {
  * Uses access token from OAuth client if present on the bound client (best-effort).
  * Prefer message payload inline data when available.
  */
+type AttachmentHit = {
+  data: string
+  size?: number
+}
+
+/** Iterative MIME walk — avoids nested-fn control-flow `never` issues */
+function findInlineAttachment(
+  payload: Record<string, unknown> | undefined,
+  attachmentId: string,
+): AttachmentHit | null {
+  if (!payload) return null
+  const stack: Record<string, unknown>[] = [payload]
+  while (stack.length > 0) {
+    const part = stack.pop()
+    if (!part) continue
+    const body = asRecord(part.body)
+    const bodyAttachmentId =
+      typeof body.attachmentId === "string" ? body.attachmentId : ""
+    const bodyData = typeof body.data === "string" ? body.data : ""
+    if (bodyAttachmentId === attachmentId && bodyData) {
+      return {
+        data: bodyData,
+        size: typeof body.size === "number" ? body.size : undefined,
+      }
+    }
+    const parts = part.parts
+    if (Array.isArray(parts)) {
+      for (const p of parts) {
+        if (p && typeof p === "object") {
+          stack.push(p as Record<string, unknown>)
+        }
+      }
+    }
+  }
+  return null
+}
+
 async function getAttachmentData(
   client: GmailApiClient,
   messageId: string,
@@ -140,30 +177,14 @@ async function getAttachmentData(
     id: messageId,
     format: "full",
   })
+  // unknown: message payload is free-form Gmail MIME JSON
   const payload = asRecord(msg).payload as Record<string, unknown> | undefined
-
-  let found: { data?: string; size?: number; attachmentId?: string } | null =
-    null
-  function walk(part: Record<string, unknown>) {
-    const body = asRecord(part.body)
-    if (body.attachmentId === attachmentId) {
-      found = {
-        data: body.data as string | undefined,
-        size: body.size as number | undefined,
-        attachmentId: body.attachmentId as string | undefined,
-      }
-    }
-    const parts = part.parts as Array<Record<string, unknown>> | undefined
-    if (parts) for (const p of parts) walk(p)
-  }
-  if (payload) walk(payload)
-
-  if (found?.data) {
-    const rawB64 = found.data
-    const stdB64 = rawB64.replace(/-/g, "+").replace(/_/g, "/")
+  const hit = findInlineAttachment(payload, attachmentId)
+  if (hit) {
+    const stdB64 = hit.data.replace(/-/g, "+").replace(/_/g, "/")
     return {
       data: stdB64,
-      size: found.size ?? Buffer.from(stdB64, "base64").length,
+      size: hit.size ?? Buffer.from(stdB64, "base64").length,
     }
   }
 
@@ -206,8 +227,9 @@ export async function runGmailOperation(
             fields.attachmentMime || "application/octet-stream",
             {
               userId: fields.userId,
-              workflowId: fields.workflowId,
-              executionId: fields.executionId,
+              // media-service requires non-empty path segments
+              workflowId: fields.workflowId ?? "workflow",
+              executionId: fields.executionId ?? "execution",
               filename: fields.attachmentName || "attachment",
             },
           )
