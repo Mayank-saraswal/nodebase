@@ -39,6 +39,7 @@ import { githubAdapter } from "@/features/integrations/adapters/github/adapter"
 import { notionAdapter } from "@/features/integrations/adapters/notion/adapter"
 import { hubspotAdapter } from "@/features/integrations/adapters/hubspot/adapter"
 import { telegramAdapter } from "@/features/integrations/adapters/telegram/adapter"
+import { discordAdapter } from "@/features/integrations/adapters/discord/adapter"
 
 /** Adapter map keyed by Corsair plugin id */
 const ADAPTERS: Partial<Record<CorsairPluginId, IntegrationAdapter>> = {
@@ -50,6 +51,7 @@ const ADAPTERS: Partial<Record<CorsairPluginId, IntegrationAdapter>> = {
   notion: notionAdapter,
   hubspot: hubspotAdapter,
   telegram: telegramAdapter,
+  discord: discordAdapter,
 }
 
 export type RunIntegrationParams = {

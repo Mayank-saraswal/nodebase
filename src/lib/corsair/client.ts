@@ -8,6 +8,7 @@ import { github } from "@corsair-dev/github"
 import { notion } from "@corsair-dev/notion"
 import { hubspot } from "@corsair-dev/hubspot"
 import { telegram } from "@corsair-dev/telegram"
+import { discord } from "@corsair-dev/discord"
 import { getCorsairPool } from "./pool"
 import {
   getAppUrl,
@@ -68,6 +69,9 @@ function buildCorsair() {
       }),
       // Telegram uses bot_token auth only — no permissions mode on the plugin options type.
       telegram(),
+      discord({
+        permissions: { mode: "open" },
+      }),
     ],
   })
 }

@@ -8,6 +8,7 @@ import { githubIntegrationDefinition } from "./integrations/github"
 import { notionIntegrationDefinition } from "./integrations/notion"
 import { hubspotIntegrationDefinition } from "./integrations/hubspot"
 import { telegramIntegrationDefinition } from "./integrations/telegram"
+import { discordIntegrationDefinition } from "./integrations/discord"
 import { resolveOperation, buildAliasMap, listOperationKeys } from "./resolve"
 import type { IntegrationDefinition } from "./types"
 
@@ -31,6 +32,7 @@ const BY_TYPE_KEY: Record<string, IntegrationDefinition> = {
   notion: notionIntegrationDefinition,
   hubspot: hubspotIntegrationDefinition,
   telegram: telegramIntegrationDefinition,
+  discord: discordIntegrationDefinition,
 }
 
 /** Map Prisma NodeType → registry typeKey */
@@ -128,4 +130,5 @@ export {
   notionIntegrationDefinition,
   hubspotIntegrationDefinition,
   telegramIntegrationDefinition,
+  discordIntegrationDefinition,
 }

@@ -14,6 +14,7 @@ import {
   notionIntegrationDefinition,
   hubspotIntegrationDefinition,
   telegramIntegrationDefinition,
+  discordIntegrationDefinition,
   buildAliasMap,
   listOperationKeys,
 } from "../index"
@@ -343,5 +344,34 @@ describe("Option C registry completeness", () => {
       "contactLists.removeContact",
     ]
     expect(corsairKeysCovered(keys, required)).toEqual([])
+  })
+
+  it("Discord registry covers all Corsair endpoints", () => {
+    const keys = listOperationKeys(discordIntegrationDefinition)
+    const required = [
+      "messages.send",
+      "messages.reply",
+      "messages.get",
+      "messages.list",
+      "messages.edit",
+      "messages.delete",
+      "threads.create",
+      "threads.createFromMessage",
+      "reactions.add",
+      "reactions.remove",
+      "reactions.list",
+      "guilds.list",
+      "guilds.get",
+      "channels.list",
+      "members.list",
+      "members.get",
+    ]
+    expect(corsairKeysCovered(keys, required)).toEqual([])
+  })
+
+  it("Discord aliases resolve SEND_MESSAGE", () => {
+    const map = buildAliasMap(discordIntegrationDefinition)
+    expect(map.get("SEND_MESSAGE")).toBe("messages.send")
+    expect(map.get("LIST_GUILDS")).toBe("guilds.list")
   })
 })
