@@ -11,6 +11,8 @@ import { telegram } from "@corsair-dev/telegram"
 import { discord } from "@corsair-dev/discord"
 import { twitter } from "@corsair-dev/twitter"
 import { razorpay } from "@corsair-dev/razorpay"
+import { stripe } from "@corsair-dev/stripe"
+import { openai } from "@corsair-dev/openai"
 import { getCorsairPool } from "./pool"
 import {
   getAppUrl,
@@ -78,6 +80,12 @@ function buildCorsair() {
         permissions: { mode: "open" },
       }),
       razorpay({
+        permissions: { mode: "open" },
+      }),
+      stripe({
+        permissions: { mode: "open" },
+      }),
+      openai({
         permissions: { mode: "open" },
       }),
     ],

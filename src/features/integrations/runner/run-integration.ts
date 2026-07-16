@@ -42,6 +42,8 @@ import { telegramAdapter } from "@/features/integrations/adapters/telegram/adapt
 import { discordAdapter } from "@/features/integrations/adapters/discord/adapter"
 import { twitterAdapter } from "@/features/integrations/adapters/twitter/adapter"
 import { razorpayAdapter } from "@/features/integrations/adapters/razorpay/adapter"
+import { stripeAdapter } from "@/features/integrations/adapters/stripe/adapter"
+import { openaiAdapter } from "@/features/integrations/adapters/openai/adapter"
 
 /** Adapter map keyed by Corsair plugin id */
 const ADAPTERS: Partial<Record<CorsairPluginId, IntegrationAdapter>> = {
@@ -56,6 +58,8 @@ const ADAPTERS: Partial<Record<CorsairPluginId, IntegrationAdapter>> = {
   discord: discordAdapter,
   twitter: twitterAdapter,
   razorpay: razorpayAdapter,
+  stripe: stripeAdapter,
+  openai: openaiAdapter,
 }
 
 export type RunIntegrationParams = {

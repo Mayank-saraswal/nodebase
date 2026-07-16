@@ -9,6 +9,7 @@ import { scheduleTriggerExecutor } from "@/features/triggers/components/schedule
 import { discordExecutor } from "../components/discord/executor";
 import { slackExecutor } from "../components/slack/executor";
 import { aiExecutor } from "../components/ai/executor";
+import { openAiExecutor } from "../components/openai/executor";
 import { telegramExecutor } from "../components/telegram/executor";
 import { xExecutor } from "../components/x/executor";
 import { workdayExecutor } from "../components/workday/executor";
@@ -53,7 +54,7 @@ export const executorRegistry = {
     [NodeType.SCHEDULE_TRIGGER]: scheduleTriggerExecutor,
     [NodeType.GEMINI]: aiExecutor,
     [NodeType.ANTHROPIC]: aiExecutor,
-    [NodeType.OPENAI]: aiExecutor,
+    [NodeType.OPENAI]: openAiExecutor,
     [NodeType.XAI]: aiExecutor,
     [NodeType.DISCORD]: discordExecutor,
     [NodeType.SLACK]: slackExecutor,

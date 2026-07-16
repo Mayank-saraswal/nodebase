@@ -17,9 +17,13 @@ import {
   discordIntegrationDefinition,
   twitterIntegrationDefinition,
   razorpayIntegrationDefinition,
+  stripeIntegrationDefinition,
+  openaiIntegrationDefinition,
   buildAliasMap,
   listOperationKeys,
 } from "../index"
+import { STRIPE_CORSAIR_ENDPOINTS } from "../integrations/stripe"
+import { OPENAI_CORSAIR_ENDPOINTS } from "../integrations/openai"
 
 /** Public Corsair Gmail endpoint paths (from @corsair-dev/gmail dist endpoints) */
 const GMAIL_CORSAIR_ENDPOINTS = [
@@ -425,5 +429,31 @@ describe("Option C registry completeness", () => {
     const map = buildAliasMap(razorpayIntegrationDefinition)
     expect(map.get("ORDER_CREATE")).toBe("orders.create")
     expect(map.get("SUBSCRIPTION_PAUSE")).toBe("subscriptions.pause")
+  })
+
+  it("Stripe registry covers all Corsair endpoints", () => {
+    const keys = listOperationKeys(stripeIntegrationDefinition)
+    expect(corsairKeysCovered(keys, STRIPE_CORSAIR_ENDPOINTS)).toEqual([])
+    expect(keys.length).toBe(STRIPE_CORSAIR_ENDPOINTS.length)
+  })
+
+  it("Stripe aliases resolve CHARGE_CREATE", () => {
+    const map = buildAliasMap(stripeIntegrationDefinition)
+    expect(map.get("CHARGE_CREATE")).toBe("charges.create")
+    expect(map.get("PAYMENT_INTENT_CREATE")).toBe("paymentIntents.create")
+  })
+
+  it("OpenAI registry covers all Corsair endpoints (129)", () => {
+    const keys = listOperationKeys(openaiIntegrationDefinition)
+    expect(corsairKeysCovered(keys, OPENAI_CORSAIR_ENDPOINTS)).toEqual([])
+    expect(keys.length).toBe(OPENAI_CORSAIR_ENDPOINTS.length)
+    expect(OPENAI_CORSAIR_ENDPOINTS.length).toBe(129)
+  })
+
+  it("OpenAI aliases resolve CHAT", () => {
+    const map = buildAliasMap(openaiIntegrationDefinition)
+    expect(map.get("CHAT")).toBe("chat.createCompletion")
+    expect(map.get("EMBED")).toBe("embeddings.create")
+    expect(map.get("IMAGE")).toBe("images.create")
   })
 })
