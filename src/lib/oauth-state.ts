@@ -1,30 +1,30 @@
-import { randomBytes, timingSafeEqual } from "node:crypto"
+import { randomBytes, timingSafeEqual } from "node:crypto";
 
 export interface OAuthStatePayload {
-  userId: string
-  credentialName: string
-  credentialType: string
-  returnUrl: string
+  userId: string;
+  credentialName: string;
+  credentialType: string;
+  returnUrl: string;
 }
 
-export const OAUTH_STATE_MAX_AGE_SECONDS = 600
+export const OAUTH_STATE_MAX_AGE_SECONDS = 600;
 
 export function createOAuthState(payload: OAuthStatePayload) {
-  const nonce = randomBytes(32).toString("base64url")
+  const nonce = randomBytes(32).toString("base64url");
   return {
     state: nonce,
     cookieValue: JSON.stringify({ nonce, ...payload }),
-  }
+  };
 }
 
 export function readOAuthState(
   cookieValue: string | undefined,
   state: string | null,
 ): OAuthStatePayload | null {
-  if (!cookieValue || !state || !/^[A-Za-z0-9_-]{43}$/.test(state)) return null
+  if (!cookieValue || !state || !/^[A-Za-z0-9_-]{43}$/.test(state)) return null;
 
   try {
-    const data = JSON.parse(cookieValue)
+    const data = JSON.parse(cookieValue);
     if (
       typeof data.nonce !== "string" ||
       typeof data.userId !== "string" ||
@@ -32,25 +32,29 @@ export function readOAuthState(
       typeof data.credentialType !== "string" ||
       typeof data.returnUrl !== "string"
     ) {
-      return null
+      return null;
     }
 
-    const nonce = Buffer.from(data.nonce)
-    const received = Buffer.from(state)
-    if (nonce.length !== received.length || !timingSafeEqual(nonce, received)) return null
+    const nonce = Buffer.from(data.nonce);
+    const received = Buffer.from(state);
+    if (nonce.length !== received.length || !timingSafeEqual(nonce, received))
+      return null;
 
     return {
       userId: data.userId,
       credentialName: data.credentialName,
       credentialType: data.credentialType,
       returnUrl: data.returnUrl,
-    }
+    };
   } catch {
-    return null
+    return null;
   }
 }
 
-export function safeReturnPath(value: string | null | undefined, fallback: string): string {
+export function safeReturnPath(
+  value: string | null | undefined,
+  fallback: string,
+): string {
   if (
     !value ||
     value.length > 2048 ||
@@ -58,15 +62,15 @@ export function safeReturnPath(value: string | null | undefined, fallback: strin
     value.startsWith("//") ||
     value.startsWith("/\\")
   ) {
-    return fallback
+    return fallback;
   }
 
   try {
-    const target = new URL(value, "https://nodebase.invalid")
-    if (target.origin !== "https://nodebase.invalid") return fallback
-    return `${target.pathname}${target.search}${target.hash}`
+    const target = new URL(value, "https://nodebase.invalid");
+    if (target.origin !== "https://nodebase.invalid") return fallback;
+    return `${target.pathname}${target.search}${target.hash}`;
   } catch {
-    return fallback
+    return fallback;
   }
 }
 
@@ -77,5 +81,5 @@ export function oauthStateCookieOptions(maxAge = OAUTH_STATE_MAX_AGE_SECONDS) {
     secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge,
-  }
+  };
 }
