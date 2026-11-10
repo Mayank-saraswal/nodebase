@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server"
 import { buildGithubAuthUrl } from "@/lib/github-auth"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
+import {
+  createOAuthState,
+  oauthStateCookieOptions,
+  safeReturnPath,
+} from "@/lib/oauth-state"
+
+const STATE_COOKIE = "nodebase_github_oauth_state"
 
 export async function GET(request: NextRequest) {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -11,21 +18,24 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = new URL(request.url)
-  const credentialName = searchParams.get("name") || "My GitHub Account"
-  const credentialType = searchParams.get("type") || "GITHUB_APP"
-  const rawReturnUrl = searchParams.get("returnUrl") || "/credentials"
-  // Only allow relative paths — block open redirect to external URLs
-  const returnUrl = rawReturnUrl.startsWith("/") ? rawReturnUrl : "/credentials"
+  const rawCredentialName = searchParams.get("name")
+  const credentialName = rawCredentialName && rawCredentialName.length <= 100
+    ? rawCredentialName
+    : "My GitHub Account"
+  const rawCredentialType = searchParams.get("type")
+  const credentialType = rawCredentialType && rawCredentialType.length <= 100
+    ? rawCredentialType
+    : "GITHUB_APP"
+  const returnUrl = safeReturnPath(searchParams.get("returnUrl"), "/credentials")
 
-  // Encode state as base64url JSON: { userId, credentialName, credentialType, returnUrl }
-  const stateData = {
+  const oauthState = createOAuthState({
     userId: session.user.id,
     credentialName,
     credentialType,
     returnUrl,
-  }
-  const state = Buffer.from(JSON.stringify(stateData)).toString("base64url")
+  })
 
-  const authUrl = buildGithubAuthUrl(state)
-  return NextResponse.redirect(authUrl)
+  const response = NextResponse.redirect(buildGithubAuthUrl(oauthState.state))
+  response.cookies.set(STATE_COOKIE, oauthState.cookieValue, oauthStateCookieOptions())
+  return response
 }

@@ -30,6 +30,16 @@ import { inngest } from "@/inngest/client";
 
 const ProviderSchema = z.nativeEnum(AgentAIProviderType);
 
+async function assertConversationOwnership(conversationId: string, userId: string) {
+  const conversation = await prisma.agentConversation.findFirst({
+    where: { id: conversationId, userId },
+    select: { id: true },
+  });
+  if (!conversation) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found." });
+  }
+}
+
 export const aiAgentRouter = createTRPCRouter({
 
   // ─── Generate ─────────────────────────────────────────────────────────────
@@ -50,10 +60,7 @@ export const aiAgentRouter = createTRPCRouter({
       let conversationId = input.conversationId;
       
       if (conversationId) {
-        const exists = await prisma.agentConversation.findUnique({ where: { id: conversationId } });
-        if (!exists) {
-          conversationId = undefined; // Force recreation
-        }
+        await assertConversationOwnership(conversationId, userId);
       }
 
       if (!conversationId) {
@@ -118,10 +125,7 @@ export const aiAgentRouter = createTRPCRouter({
       let conversationId = input.conversationId;
       
       if (conversationId) {
-        const exists = await prisma.agentConversation.findUnique({ where: { id: conversationId } });
-        if (!exists) {
-          conversationId = undefined; // Force recreation
-        }
+        await assertConversationOwnership(conversationId, userId);
       }
 
       if (!conversationId) {

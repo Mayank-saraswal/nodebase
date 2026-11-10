@@ -157,7 +157,10 @@ export async function generateWorkflow(params: GenerationParams): Promise<Genera
 
   // Fetch conversation history
   const history = await prisma.agentMessage.findMany({
-    where: { conversationId: params.conversationId },
+    where: {
+      conversationId: params.conversationId,
+      conversation: { is: { userId: params.userId } },
+    },
     orderBy: { createdAt: "asc" },
   });
 
