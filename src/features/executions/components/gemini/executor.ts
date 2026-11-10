@@ -1,143 +1,102 @@
-import type { NodeExecutor } from "@/features/executions/types";
-import { NonRetriableError } from "inngest";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { resolveTemplate } from "@/features/executions/lib/template-resolver";
-import {geminiChannel } from "@/inngest/channels/gemini";
-import { generateText } from "ai";
-import prisma from "@/lib/db";
-import { decrypt } from "@/lib/encryption";
+/**
+ * Gemini dual-path executor:
+ * 1) Corsair full surface when plugin enabled
+ * 2) Shared aiExecutor legacy path
+ */
+
+import { NonRetriableError, RetryAfterError } from "inngest"
+import type { NodeExecutor, WorkflowContext } from "@/features/executions/types"
+import { asString } from "@/features/executions/types"
+import { geminiChannel } from "@/inngest/channels/gemini"
+import {
+  mapCorsairError,
+  resolveTenantId,
+} from "@/lib/corsair"
+import { tryRunIntegration } from "@/features/integrations/runner"
+import { isGeminiCorsairOp } from "@/features/integrations/adapters/gemini/operations"
+import { NodeType } from "@/generated/prisma"
+import { aiExecutor } from "@/features/executions/components/ai/executor"
 
 type GeminiData = {
-    variableName?:string
-    credentialId?:string
-    // model?: string;
-    userPrompt?: string;
-    systemPrompt?: string;
-};
-export const geminiExecutor:NodeExecutor<GeminiData > = async({
+  variableName?: string
+  credentialId?: string
+  userPrompt?: string
+  systemPrompt?: string
+  operation?: string
+  model?: string
+}
+
+export const geminiExecutor: NodeExecutor<GeminiData> = async (params) => {
+  const {
     data,
     nodeId,
     context,
     step,
     publish,
-    userId
-}) =>{
+    userId,
+    tenantId: tenantIdParam,
+  } = params
 
-     await publish (
-        geminiChannel().status({
-            nodeId,
-            status:"loading"
-        })
-     )
+  // unknown: Node.data JSON boundary
+  const config = (data ?? {}) as Record<string, unknown>
+  const operation = asString(config.operation, "CHAT")
 
-
-     if (!data.variableName) {
-        await publish(
-            geminiChannel().status({
-                nodeId,
-                status:"error",
-                
-            })
-         );
-         throw new NonRetriableError("gemini node: Variable name is missing")
-     }
-
-     if (!data.userPrompt) {
-        await publish(
-            geminiChannel().status({
-                nodeId,
-                status:"error",
-                
-            })
-         );
-         throw new NonRetriableError("gemini node: user prompt is missing")
-     }
-
-     if (!data.credentialId) {
-        await publish(
-            geminiChannel().status({
-                nodeId,
-                status:"error",
-                
-            })
-         );
-         throw new NonRetriableError("gemini node: credential is missing")
-     }
-    
- 
-    const systemPrompt = data.systemPrompt 
-    ? resolveTemplate(data.systemPrompt, context)
-    :   "You are a helpful assistant" 
-
-    const userPrompt = data.userPrompt 
-    ? resolveTemplate(data.userPrompt, context)
-    : "No prompt provided"
-
-    //Fetch credentials 
-    const credential = await step.run("get-credential",()=>{
-        return prisma.credential.findUnique({
-            where:{
-                id:data.credentialId,
-                userId
-            }
-        })
-    });
-
-    if (!credential) {
-        throw new NonRetriableError("gemini node: credential not found")
-    }
-
-
-    const google = createGoogleGenerativeAI({
-        apiKey: decrypt(credential.value)
-    })
-
-
+  if (isGeminiCorsairOp(operation) && userId) {
+    await publish(
+      geminiChannel().status({ nodeId, status: "loading" }),
+    )
+    const tenantId =
+      tenantIdParam && tenantIdParam.trim() !== ""
+        ? tenantIdParam
+        : resolveTenantId({ userId })
     try {
-        const {steps} = await step.ai.wrap(
-            "gemini-generate-text",
-            generateText,
-            {
-                model: google("gemini-2.5-flash"),
-                prompt: userPrompt,
-                system: systemPrompt,
-                experimental_telemetry:{
-                    isEnabled:true,
-                    recordInputs:true,
-                    recordOutputs:true
-                }
+      const corsairResult = await step.run(
+        `gemini-${nodeId}-corsair`,
+        async () => {
+          return tryRunIntegration({
+            nodeType: NodeType.GEMINI,
+            data: {
+              ...config,
+              operation,
+              userPrompt:
+                config.userPrompt ?? config.prompt ?? config.message,
+              systemPrompt: config.systemPrompt ?? config.system,
             },
-        )
-
-        const  text = 
-        steps[0].content[0].type==="text"
-        ? steps[0].content[0].text
-        :""
-
+            context,
+            nodeId,
+            userId,
+            tenantId,
+          })
+        },
+      )
+      if (corsairResult) {
         await publish(
-            geminiChannel().status({
-                nodeId,
-                status:"success",
-                
-            }),
+          geminiChannel().status({ nodeId, status: "success" }),
         )
-            return {
-                ...context,
-                [data.variableName]:{
-                    aiResponse:text,
-                },
-            }
-        
-        
+        return corsairResult.context
+      }
     } catch (error) {
-        console.error('Gemini API Error:', error);
-        await publish(
-            geminiChannel().status({
-                nodeId,
-                status:"error",
-                
-            })
-         )
-        throw new NonRetriableError(`Gemini API error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      if (
+        error instanceof NonRetriableError ||
+        error instanceof RetryAfterError
+      ) {
+        await publish(geminiChannel().status({ nodeId, status: "error" }))
+        throw error
+      }
+      await publish(geminiChannel().status({ nodeId, status: "error" }))
+      mapCorsairError(error, "Gemini")
     }
+  }
+
+  const legacyData = {
+    ...config,
+    provider: "GEMINI",
+    operation: asString(config.operation, "CHAT"),
+    model: asString(config.model, "gemini-2.0-flash"),
+  }
+
+  return (await aiExecutor({
+    ...params,
+    data: legacyData as never,
+  })) as WorkflowContext
 }

@@ -18,12 +18,7 @@ export const IfElseNode = memo((props: NodeProps) => {
   const workflowId = params.workflowId as string
   const trpc = useTRPC()
 
-  const { data: config } = useQuery(
-    trpc.ifElse.getByNodeId.queryOptions(
-      { nodeId: props.id },
-      { enabled: !!props.id }
-    )
-  )
+  const config = props.data as any;
 
   let conditionPreview = "Not configured"
   let isConfigured = false

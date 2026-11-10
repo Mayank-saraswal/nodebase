@@ -31,7 +31,7 @@ const OPERATION_MAP = {
 } as const;
 
 export const workdayExecutor: NodeExecutor<WorkdayData> = async ({
-    data,
+  data,
     nodeId,
     context,
     step,

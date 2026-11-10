@@ -1,143 +1,102 @@
-import type { NodeExecutor } from "@/features/executions/types";
-import { NonRetriableError } from "inngest";
-import { resolveTemplate } from "@/features/executions/lib/template-resolver";
-import { generateText } from "ai";
-import prisma from "@/lib/db";
-import { decrypt } from "@/lib/encryption";
-import { deepseekChannel } from "@/inngest/channels/deepseek";
-import { createDeepSeek } from "@ai-sdk/deepseek";
+/**
+ * DeepSeek dual-path executor:
+ * 1) Corsair full surface when plugin enabled
+ * 2) Shared aiExecutor legacy path
+ */
+
+import { NonRetriableError, RetryAfterError } from "inngest"
+import type { NodeExecutor, WorkflowContext } from "@/features/executions/types"
+import { asString } from "@/features/executions/types"
+import { deepseekChannel } from "@/inngest/channels/deepseek"
+import {
+  mapCorsairError,
+  resolveTenantId,
+} from "@/lib/corsair"
+import { tryRunIntegration } from "@/features/integrations/runner"
+import { isDeepseekCorsairOp } from "@/features/integrations/adapters/deepseek/operations"
+import { NodeType } from "@/generated/prisma"
+import { aiExecutor } from "@/features/executions/components/ai/executor"
 
 type DeepseekData = {
-    variableName?: string
-    credentialId?: string
-    // model?: string;
-    userPrompt?: string;
-    systemPrompt?: string;
-};
-export const deepseekExecutor: NodeExecutor<DeepseekData> = async ({
+  variableName?: string
+  credentialId?: string
+  userPrompt?: string
+  systemPrompt?: string
+  operation?: string
+  model?: string
+}
+
+export const deepseekExecutor: NodeExecutor<DeepseekData> = async (params) => {
+  const {
     data,
     nodeId,
     context,
     step,
     publish,
-    userId
-}) => {
+    userId,
+    tenantId: tenantIdParam,
+  } = params
 
+  // unknown: Node.data JSON boundary
+  const config = (data ?? {}) as Record<string, unknown>
+  const operation = asString(config.operation, "CHAT")
+
+  if (isDeepseekCorsairOp(operation) && userId) {
     await publish(
-        deepseekChannel().status({
-            nodeId,
-            status: "loading"
-        })
+      deepseekChannel().status({ nodeId, status: "loading" }),
     )
-
-
-    if (!data.variableName) {
-        await publish(
-            deepseekChannel().status({
-                nodeId,
-                status: "error",
-
-            })
-        );
-        throw new NonRetriableError("deepseek node: Variable name is missing")
-    }
-
-    if (!data.userPrompt) {
-        await publish(
-            deepseekChannel().status({
-                nodeId,
-                status: "error",
-
-            })
-        );
-        throw new NonRetriableError("deepseek node: user prompt is missing")
-    }
-
-    if (!data.credentialId) {
-        await publish(
-            deepseekChannel().status({
-                nodeId,
-                status: "error",
-
-            })
-        );
-        throw new NonRetriableError("deepseek node: credential is missing")
-    }
-
-
-    const systemPrompt = data.systemPrompt
-        ? resolveTemplate(data.systemPrompt, context)
-        : "You are a helpful assistant"
-
-    const userPrompt = data.userPrompt
-        ? resolveTemplate(data.userPrompt, context)
-        : "No prompt provided"
-
-    //Fetch credentials 
-    const credential = await step.run("get-credential", () => {
-        return prisma.credential.findUnique({
-            where: {
-                id: data.credentialId,
-                userId
-            }
-        })
-    });
-
-    if (!credential) {
-        throw new NonRetriableError("deepseek node: credential not found")
-    }
-
-
-    const deepseek = createDeepSeek({
-        apiKey: decrypt(credential.value)
-    })
-
-
+    const tenantId =
+      tenantIdParam && tenantIdParam.trim() !== ""
+        ? tenantIdParam
+        : resolveTenantId({ userId })
     try {
-        const { steps } = await step.ai.wrap(
-            "deepseek-generate-text",
-            generateText,
-            {
-                model: deepseek("deepseek-chat"),
-                prompt: userPrompt,
-                system: systemPrompt,
-                experimental_telemetry: {
-                    isEnabled: true,
-                    recordInputs: true,
-                    recordOutputs: true
-                }
+      const corsairResult = await step.run(
+        `deepseek-${nodeId}-corsair`,
+        async () => {
+          return tryRunIntegration({
+            nodeType: NodeType.DEEPSEEK,
+            data: {
+              ...config,
+              operation,
+              userPrompt:
+                config.userPrompt ?? config.prompt ?? config.message,
+              systemPrompt: config.systemPrompt ?? config.system,
             },
-        )
-
-        const text =
-            steps[0].content[0].type === "text"
-                ? steps[0].content[0].text
-                : ""
-
+            context,
+            nodeId,
+            userId,
+            tenantId,
+          })
+        },
+      )
+      if (corsairResult) {
         await publish(
-            deepseekChannel().status({
-                nodeId,
-                status: "success",
-
-            }),
+          deepseekChannel().status({ nodeId, status: "success" }),
         )
-        return {
-            ...context,
-            [data.variableName]: {
-                aiResponse: text,
-            },
-        }
-
-
+        return corsairResult.context
+      }
     } catch (error) {
-        console.error('Deepseek API Error:', error);
-        await publish(
-            deepseekChannel().status({
-                nodeId,
-                status: "error",
-
-            })
-        )
-        throw new NonRetriableError(`Deepseek API error: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      if (
+        error instanceof NonRetriableError ||
+        error instanceof RetryAfterError
+      ) {
+        await publish(deepseekChannel().status({ nodeId, status: "error" }))
+        throw error
+      }
+      await publish(deepseekChannel().status({ nodeId, status: "error" }))
+      mapCorsairError(error, "DeepSeek")
     }
+  }
+
+  const legacyData = {
+    ...config,
+    provider: "DEEPSEEK",
+    operation: asString(config.operation, "CHAT"),
+    model: asString(config.model, "deepseek-chat"),
+  }
+
+  return (await aiExecutor({
+    ...params,
+    data: legacyData as never,
+  })) as WorkflowContext
 }

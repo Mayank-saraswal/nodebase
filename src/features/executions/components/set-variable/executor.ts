@@ -3,8 +3,7 @@ import prisma from "@/lib/db"
 import { resolveTemplate } from "@/features/executions/lib/template-resolver"
 import { setVariableChannel } from "@/inngest/channels/set-variable"
 
-export const setVariableExecutor: NodeExecutor = async ({
-  nodeId,
+export const setVariableExecutor: NodeExecutor = async ({ data, nodeId,
   context,
   step,
   publish,
@@ -16,13 +15,9 @@ export const setVariableExecutor: NodeExecutor = async ({
     })
   )
 
-  const config = await step.run(`set-variable-${nodeId}-load-config`, async () => {
-    return prisma.setVariableNode.findUnique({
-      where: { nodeId },
-    })
-  })
+  const config = data as any;
 
-  if (!config) {
+if (!config) {
     await publish(
       setVariableChannel().status({
         nodeId,

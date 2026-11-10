@@ -1,4 +1,4 @@
-import { GitHubOperation } from "@/generated/prisma"
+import { GitHubOperation } from "@/features/executions/enums"
 
 type GitHubOp = keyof typeof GitHubOperation
 
@@ -337,10 +337,94 @@ export const OPERATION_GROUPS: { label: string; ops: GitHubOp[] }[] = [
 
 /** Determine which field group a given operation belongs to */
 export function getFieldCategory(op: string): string {
-  if (op.startsWith("REPOSITORY_") || op.startsWith("FILE_") || op.startsWith("BRANCH_") || op.startsWith("RELEASE_") || op.startsWith("GIST_")) return "repo"
-  if (op.startsWith("ISSUE_") || op.startsWith("PULL_REQUEST_") || op.startsWith("DISCUSSION_")) return "issues"
-  if (op.startsWith("WORKFLOW_") || op.startsWith("DEPLOYMENT_") || op.startsWith("AGENT_TASK_") || op.startsWith("ARTIFACT_")) return "workflows"
-  if (op.startsWith("USER_") || op.startsWith("ORG_") || op.startsWith("SECRET_") || op.startsWith("ENVIRONMENT_") || op.startsWith("PACKAGE_")) return "users-orgs"
-  if (op.startsWith("SEARCH_") || op.startsWith("CODESPACES_") || op.startsWith("COPILOT_") || op.startsWith("RULESET_") || op.startsWith("PROJECT_V2_") || op.startsWith("ATTESTATION_") || op.startsWith("ADVISORY_")) return "search-misc"
+  if (
+    op.startsWith("REPOSITORY_") ||
+    op.startsWith("FILE_") ||
+    op.startsWith("BRANCH_") ||
+    op.startsWith("RELEASE_") ||
+    op.startsWith("GIST_") ||
+    op.startsWith("COMMIT_")
+  ) {
+    return "repo"
+  }
+  if (
+    op.startsWith("ISSUE_") ||
+    op.startsWith("PULL_REQUEST_") ||
+    op.startsWith("DISCUSSION_")
+  ) {
+    return "issues"
+  }
+  if (
+    op.startsWith("WORKFLOW_") ||
+    op.startsWith("DEPLOYMENT_") ||
+    op.startsWith("AGENT_TASK_") ||
+    op.startsWith("ARTIFACT_")
+  ) {
+    return "workflows"
+  }
+  if (
+    op.startsWith("USER_") ||
+    op.startsWith("ORG_") ||
+    op.startsWith("SECRET_") ||
+    op.startsWith("ENVIRONMENT_") ||
+    op.startsWith("PACKAGE_")
+  ) {
+    return "users-orgs"
+  }
+  if (
+    op.startsWith("SEARCH_") ||
+    op.startsWith("CODESPACES_") ||
+    op.startsWith("COPILOT_") ||
+    op.startsWith("RULESET_") ||
+    op.startsWith("PROJECT_V2_") ||
+    op.startsWith("ATTESTATION_") ||
+    op.startsWith("ADVISORY_")
+  ) {
+    return "search-misc"
+  }
   return "generic"
+}
+
+/**
+ * Product ops that map to @corsair-dev/github (see registry/integrations/github.ts).
+ * Used in the dialog UI to badge Corsair-backed operations.
+ */
+const CORSAIR_BACKED_OPS = new Set<string>([
+  "ISSUE_LIST",
+  "ISSUE_GET",
+  "ISSUE_CREATE",
+  "ISSUE_UPDATE",
+  "ISSUE_CLOSE",
+  "ISSUE_REOPEN",
+  "ISSUE_CREATE_COMMENT",
+  "ISSUE_LIST_COMMENTS",
+  "ISSUE_UPDATE_COMMENT",
+  "ISSUE_DELETE_COMMENT",
+  "PULL_REQUEST_LIST",
+  "PULL_REQUEST_GET",
+  "PULL_REQUEST_LIST_REVIEWS",
+  "PULL_REQUEST_CREATE_REVIEW",
+  "REPOSITORY_LIST",
+  "REPOSITORY_GET",
+  "REPOSITORY_LIST_EVENTS",
+  "BRANCH_LIST",
+  "FILE_GET",
+  "FILE_GET_CONTENTS",
+  "FILE_LIST",
+  "RELEASE_LIST",
+  "RELEASE_GET",
+  "RELEASE_CREATE",
+  "RELEASE_UPDATE",
+  "WORKFLOW_LIST",
+  "WORKFLOW_GET",
+  "WORKFLOW_RUN_LIST",
+  "DISCUSSION_LIST",
+  "DISCUSSION_GET",
+  "USER_GET",
+  "USER_GET_CURRENT",
+  "USER_LIST",
+])
+
+export function isCorsairBackedGitHubOp(op: string): boolean {
+  return CORSAIR_BACKED_OPS.has(op)
 }

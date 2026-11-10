@@ -4,8 +4,7 @@ import prisma from "@/lib/db"
 import { codeChannel } from "@/inngest/channels/code"
 import { runCodeSandbox } from "@/features/executions/lib/code-sandbox"
 
-export const codeExecutor: NodeExecutor = async ({
-  nodeId,
+export const codeExecutor: NodeExecutor = async ({ data, nodeId,
   context,
   step,
   publish,
@@ -18,11 +17,9 @@ export const codeExecutor: NodeExecutor = async ({
   )
 
   // Step 1: Load config
-  const config = await step.run(`code-${nodeId}-load-config`, async () => {
-    return prisma.codeNode.findUnique({ where: { nodeId } })
-  })
+  const config = data as any;
 
-  if (!config) {
+if (!config) {
     await publish(
       codeChannel().status({
         nodeId,

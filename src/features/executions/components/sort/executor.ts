@@ -12,22 +12,16 @@ import {
 } from "./sort-engine"
 import type { SortKey } from "./types"
 
-export const sortExecutor: NodeExecutor = async ({
-  nodeId,
+export const sortExecutor: NodeExecutor = async ({ data, nodeId,
   context,
   step,
   publish,
   userId,
 }) => {
   // Load config
-  const config = await step.run(`sort-${nodeId}-load`, async () => {
-    return prisma.sortNode.findUnique({
-      where: { nodeId },
-      include: { workflow: { select: { userId: true } } },
-    })
-  })
+  const config = data as any;
 
-  // Validate
+// Validate
   await step.run(`sort-${nodeId}-validate`, async () => {
     if (!config) {
       throw new NonRetriableError(

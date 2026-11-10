@@ -5,25 +5,16 @@ import { resolveTemplate } from "@/features/executions/lib/template-resolver"
 import { mediaUploadChannel } from "@/inngest/channels/media-upload"
 import { uploadMedia } from "@/lib/media-service"
 
-export const mediaUploadExecutor: NodeExecutor = async ({
-  nodeId,
+export const mediaUploadExecutor: NodeExecutor = async ({ data, nodeId,
   userId,
   context,
   step,
   publish,
 }) => {
   // STEP 1: Load config
-  const config = await step.run(`media-upload-${nodeId}-load`, async () => {
-    const node = await prisma.mediaUploadNode.findUnique({
-      where: { nodeId },
-      include: { workflow: { select: { userId: true } } },
-    })
-    if (!node) throw new NonRetriableError("MediaUpload node not configured")
-    if (node.workflow.userId !== userId) throw new NonRetriableError("Unauthorized")
-    return node
-  })
+  const config = data as any;
 
-  // STEP 2: Validate
+// STEP 2: Validate
   await step.run(`media-upload-${nodeId}-validate`, async () => {
     const input = resolveTemplate(config.inputField, context)
     if (!input?.trim()) {

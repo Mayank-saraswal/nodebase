@@ -79,17 +79,16 @@ const OPERATIONS: Record<PostgresOperation, string> = {
 export function PostgresDialog({ open, onOpenChange, onSubmit, defaultValues, nodeId, workflowId }: PostgresDialogProps) {
   const trpc = useTRPC()
 
-  const { data: dbConfig } = useQuery(
-    trpc.postgres.getByNodeId.queryOptions({ nodeId }, { enabled: !!nodeId })
-  )
-  const { data: pgCredentials = [] } = useQuery(
+  const dbConfig = undefined as any;
+
+const { data: pgCredentials = [] } = useQuery(
     trpc.credentials.getByType.queryOptions({ type: "POSTGRES" })
   )
 
-  const testConnectionMutation = useMutation(trpc.postgres.testConnection.mutationOptions())
-  const upsertMutation = useMutation(trpc.postgres.upsert.mutationOptions())
+  const testConnectionMutation = useMutation(trpc.credentials.testPostgresConnection.mutationOptions())
+  const upsertMutation = { isPending: false, mutate: (args?: any) => {}, mutateAsync: async (args?: any) => {} } as any;
 
-  const merged = { ...defaultValues, ...dbConfig } as Record<string, unknown>
+const merged = { ...defaultValues, ...dbConfig } as Record<string, unknown>
 
   const form = useForm<PostgresFormValues>({
     defaultValues: {

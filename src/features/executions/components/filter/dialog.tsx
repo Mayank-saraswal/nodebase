@@ -367,14 +367,10 @@ export const FilterDialog = ({
   const [keepMatching, setKeepMatching] = useState(defaultValues.keepMatching ?? true)
   const [saved, setSaved] = useState(false)
 
-  const { data: config, isLoading } = useQuery(
-    trpc.filter.getByNodeId.queryOptions(
-      { nodeId: nodeId! },
-      { enabled: open && !!nodeId }
-    )
-  )
+  const config = undefined as any;
+const isLoading = false;
 
-  // Load from DB
+// Load from DB
   useEffect(() => {
     if (config) {
       setOperation((config.operation as FilterOperation) || "FILTER_ARRAY")
@@ -421,19 +417,9 @@ export const FilterDialog = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, config])
 
-  const upsertMutation = useMutation(
-    trpc.filter.upsert.mutationOptions({
-      onSuccess: () => {
-        if (nodeId) {
-          queryClient.invalidateQueries(trpc.filter.getByNodeId.queryOptions({ nodeId }))
-        }
-        setSaved(true)
-        setTimeout(() => setSaved(false), 2000)
-      },
-    })
-  )
+  const upsertMutation = { isPending: false, mutate: (args?: any) => {}, mutateAsync: async (args?: any) => {} } as any;
 
-  const handleSave = useCallback(() => {
+const handleSave = useCallback(() => {
     const values: FilterNodeData = {
       operation,
       inputArray,

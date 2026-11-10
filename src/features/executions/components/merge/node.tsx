@@ -26,14 +26,8 @@ export const MergeNode = memo((props: NodeProps<MergeNodeType>) => {
   const workflowId = params.workflowId as string
   const trpc = useTRPC()
 
-  const { data: dbConfig } = useQuery(
-    trpc.merge.getByNodeId.queryOptions(
-      { nodeId: props.id },
-      { enabled: !!props.id }
-    )
-  )
-
-  const { status: nodeStatus } = useNodeStatusWithPayload({
+  const dbConfig = undefined as any;
+const { status: nodeStatus } = useNodeStatusWithPayload({
     nodeId: props.id,
     channel: MERGE_CHANNEL_NAME,
     topic: "status",

@@ -1,4 +1,4 @@
-import { GitHubOperation } from "@/generated/prisma";
+import { GitHubOperation } from "@/features/executions/enums"
 import { GitHubClient } from "../api-client";
 import { GitHubConfig } from "../types";
 import { resolveTemplate } from "@/features/executions/lib/template-resolver";

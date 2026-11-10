@@ -13,21 +13,12 @@ import {
 } from "./query-builder"
 import type { WhereCondition, OrderByClause, JoinClause, ColumnDefinition, TransactionStatement } from "./types"
 
-export const postgresExecutor: NodeExecutor = async ({
-  nodeId, context, step, publish, userId,
+export const postgresExecutor: NodeExecutor = async ({ data, nodeId, context, step, publish, userId,
 }) => {
   // ── Step 1: Load config ───────────────────────────────────────────────────
-  const config = await step.run(`postgres-${nodeId}-load`, async () => {
-    return prisma.postgresNode.findUnique({
-      where: { nodeId },
-      include: {
-        workflow: { select: { userId: true } },
-        credential: true,
-      },
-    })
-  })
+  const config = data as any;
 
-  await step.run(`postgres-${nodeId}-validate`, async () => {
+await step.run(`postgres-${nodeId}-validate`, async () => {
     if (!config) throw new NonRetriableError("Postgres node not configured.")
     if (config.workflow.userId !== userId) throw new NonRetriableError("Unauthorized")
     if (!config.credentialId || !config.credential) {

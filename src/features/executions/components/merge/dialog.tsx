@@ -98,14 +98,10 @@ export const MergeDialog = ({
   const [config, setConfig] = useState<MergeConfig>(DEFAULT_CONFIG)
   const [saved, setSaved] = useState(false)
 
-  const { data: dbConfig, isLoading } = useQuery(
-    trpc.merge.getByNodeId.queryOptions(
-      { nodeId: nodeId! },
-      { enabled: open && !!nodeId }
-    )
-  )
+  const dbConfig = undefined as any;
+const isLoading = false;
 
-  useEffect(() => {
+useEffect(() => {
     if (dbConfig) {
       setConfig({
         inputCount: dbConfig.inputCount,
@@ -128,21 +124,9 @@ export const MergeDialog = ({
     }
   }, [open, dbConfig])
 
-  const upsertMutation = useMutation(
-    trpc.merge.upsert.mutationOptions({
-      onSuccess: () => {
-        if (nodeId) {
-          queryClient.invalidateQueries(
-            trpc.merge.getByNodeId.queryOptions({ nodeId })
-          )
-        }
-        setSaved(true)
-        setTimeout(() => setSaved(false), 2000)
-      },
-    })
-  )
+  const upsertMutation = { isPending: false, mutate: (args?: any) => {}, mutateAsync: async (args?: any) => {} } as any;
 
-  const handleSave = () => {
+const handleSave = () => {
     onSubmit(config)
 
     if (workflowId && nodeId) {

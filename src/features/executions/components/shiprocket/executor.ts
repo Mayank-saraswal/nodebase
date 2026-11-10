@@ -4,7 +4,7 @@ import prisma from "@/lib/db"
 import { decrypt } from "@/lib/encryption"
 import { resolveTemplate } from "@/features/executions/lib/template-resolver"
 import { shiprocketChannel } from "@/inngest/channels/shiprocket"
-import { ShiprocketOperation } from "@/generated/prisma"
+import { ShiprocketOperation } from "@/features/executions/enums"
 
 interface ShiprocketCredential {
   email: string
@@ -85,8 +85,7 @@ async function shiprocketRequest(
   }
 }
 
-export const shiprocketExecutor: NodeExecutor<ShiprocketData> = async ({
-  nodeId,
+export const shiprocketExecutor: NodeExecutor<ShiprocketData> = async ({ data, nodeId,
   context,
   step,
   publish,
@@ -100,11 +99,9 @@ export const shiprocketExecutor: NodeExecutor<ShiprocketData> = async ({
   )
 
   // Step 1: Load config
-  const config = await step.run(`shiprocket-${nodeId}-load-config`, async () => {
-    return prisma.shiprocketNode.findUnique({ where: { nodeId } })
-  })
+  const config = data as any;
 
-  if (!config) {
+if (!config) {
     await publish(
       shiprocketChannel().status({
         nodeId,

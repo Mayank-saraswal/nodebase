@@ -7,7 +7,7 @@ import { FreshdeskDialog, type FreshdeskFormValues } from "./dialog"
 import { useNodeStatus } from "@/features/triggers/components/shared/hooks/use-node-status"
 import { FRESHDESK_CHANNEL_NAME } from "@/inngest/channels/freshdesk"
 import { fetchFreshdeskRealtimeToken } from "./actions"
-import { FreshdeskOperation } from "@/generated/prisma"
+import { FreshdeskOperation } from "@/features/executions/enums"
 import { useParams } from "next/navigation"
 
 type FreshdeskNodeData = {

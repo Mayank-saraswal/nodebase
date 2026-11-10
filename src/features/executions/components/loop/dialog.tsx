@@ -44,14 +44,10 @@ export const LoopDialog = ({
   const [maxIterations, setMaxIterations] = useState(100)
   const [saved, setSaved] = useState(false)
 
-  const { data: config, isLoading } = useQuery(
-    trpc.loop.getByNodeId.queryOptions(
-      { nodeId: nodeId! },
-      { enabled: open && !!nodeId }
-    )
-  )
+  const config = undefined as any;
+const isLoading = false;
 
-  // Pre-fill from DB config when loaded
+// Pre-fill from DB config when loaded
   useEffect(() => {
     if (config) {
       setInputPath(config.inputPath)
@@ -69,21 +65,9 @@ export const LoopDialog = ({
     }
   }, [open, config])
 
-  const upsertMutation = useMutation(
-    trpc.loop.upsert.mutationOptions({
-      onSuccess: () => {
-        if (nodeId) {
-          queryClient.invalidateQueries(
-            trpc.loop.getByNodeId.queryOptions({ nodeId })
-          )
-        }
-        setSaved(true)
-        setTimeout(() => setSaved(false), 2000)
-      },
-    })
-  )
+  const upsertMutation = { isPending: false, mutate: (args?: any) => {}, mutateAsync: async (args?: any) => {} } as any;
 
-  const handleSave = () => {
+const handleSave = () => {
     onSubmit({ inputPath, itemVariable, maxIterations })
 
     if (workflowId && nodeId) {

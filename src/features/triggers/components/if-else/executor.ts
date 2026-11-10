@@ -1,6 +1,6 @@
 import type { NodeExecutor } from "@/features/executions/types"
 import prisma from "@/lib/db"
-import { IfElseOperator } from "@/generated/prisma"
+import { IfElseOperator } from "./types"
 import {
   evaluateConditions,
   parseConditionsJson,
@@ -99,12 +99,15 @@ export function evaluateCondition(
   }
 }
 
-export const ifElseExecutor: NodeExecutor = async ({ nodeId, context, step }) => {
-  const config = await step.run(`if-else-${nodeId}-load-config`, async () => {
-    return prisma.ifElseNode.findUnique({
-      where: { nodeId },
-    })
-  })
+type IfElseData = {
+  field?: string
+  operator?: IfElseOperator
+  value?: string
+  conditionsJson?: string
+}
+
+export const ifElseExecutor: NodeExecutor<IfElseData> = async ({ data, context }) => {
+  const config = data
 
   if (!config) {
     return {
@@ -114,7 +117,7 @@ export const ifElseExecutor: NodeExecutor = async ({ nodeId, context, step }) =>
   }
 
   // Use compound conditions if conditionsJson is set, otherwise fall back to legacy single-condition
-  const conditionsConfig = parseConditionsJson(config.conditionsJson)
+  const conditionsConfig = parseConditionsJson(config.conditionsJson ?? "")
 
   if (conditionsConfig) {
     const ctx = (typeof context === "object" && context !== null ? context : {}) as Record<string, unknown>
@@ -128,9 +131,9 @@ export const ifElseExecutor: NodeExecutor = async ({ nodeId, context, step }) =>
   // Legacy single-condition path
   const result = evaluateCondition(
     context,
-    config.field,
-    config.operator,
-    config.value
+    config.field ?? "",
+    config.operator ?? IfElseOperator.EQUALS,
+    config.value ?? ""
   )
 
   return {

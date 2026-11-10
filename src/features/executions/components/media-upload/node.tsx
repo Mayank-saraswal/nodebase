@@ -6,7 +6,7 @@ import { MediaUploadDialog, MediaUploadFormValues } from "./dialog"
 import { useNodeStatus } from "@/features/triggers/components/shared/hooks/use-node-status"
 import { fetchMediaUploadRealtimeToken } from "./actions"
 import { mediaUploadChannelName } from "@/inngest/channels/media-upload"
-import { MediaUploadSource } from "@/generated/prisma"
+import { MediaUploadSource } from "@/features/executions/enums"
 import { useParams } from "next/navigation"
 
 export type MediaUploadNodeData = {

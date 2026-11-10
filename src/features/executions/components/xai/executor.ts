@@ -16,7 +16,7 @@ type XaiData = {
     systemPrompt?: string;
 };
 export const xAiExecutor: NodeExecutor<XaiData> = async ({
-    data,
+  data,
     nodeId,
     context,
     step,

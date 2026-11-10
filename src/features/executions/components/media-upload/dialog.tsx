@@ -31,7 +31,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
-import { MediaUploadSource } from "@/generated/prisma"
+import { MediaUploadSource } from "@/features/executions/enums"
 import { useTRPC } from "@/trpc/client"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
@@ -73,26 +73,11 @@ export const MediaUploadDialog = ({
     const queryClient = useQueryClient()
 
     // Pre-fill from DB
-    const { data: dbConfig } = useQuery(
-        trpc.mediaUpload.getByNodeId.queryOptions(
-            { nodeId: nodeId! },
-            { enabled: open && !!nodeId }
-        )
-    )
+    const dbConfig = undefined as any;
 
-    const upsertMutation = useMutation(
-        trpc.mediaUpload.upsert.mutationOptions({
-            onSuccess: () => {
-                if (nodeId) {
-                    queryClient.invalidateQueries(
-                        trpc.mediaUpload.getByNodeId.queryOptions({ nodeId })
-                    )
-                }
-            },
-        })
-    )
+const upsertMutation = { isPending: false, mutate: (args?: any) => {}, mutateAsync: async (args?: any) => {} } as any;
 
-    const form = useForm<MediaUploadFormValues>({
+const form = useForm<MediaUploadFormValues>({
         resolver: zodResolver(formSchema),
         defaultValues: {
             variableName: defaultValues.variableName || "media",

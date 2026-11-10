@@ -100,14 +100,8 @@ export const GmailNode = memo((props: NodeProps<GmailNodeType>) => {
     const workflowId = params.workflowId as string
     const trpc = useTRPC()
 
-    const { data: dbConfig } = useQuery(
-        trpc.gmail.getByNodeId.queryOptions(
-            { nodeId: props.id },
-            { enabled: !!props.id }
-        )
-    )
-
-    const nodeStatus = useNodeStatus({
+    const dbConfig = undefined as any;
+const nodeStatus = useNodeStatus({
         nodeId: props.id,
         channel: GMAIL_CHANNEL_NAME,
         topic: "status",

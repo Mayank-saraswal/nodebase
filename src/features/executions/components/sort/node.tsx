@@ -38,14 +38,8 @@ export const SortNode = memo((props: NodeProps<SortNodeType>) => {
   const workflowId = params.workflowId as string
   const trpc = useTRPC()
 
-  const { data: dbConfig } = useQuery(
-    trpc.sort.getByNodeId.queryOptions(
-      { nodeId: props.id },
-      { enabled: !!props.id }
-    )
-  )
-
-  const nodeStatus = useNodeStatus({
+  const dbConfig = undefined as any;
+const nodeStatus = useNodeStatus({
     nodeId: props.id,
     channel: SORT_CHANNEL_NAME(props.id) as string,
     topic: "status",

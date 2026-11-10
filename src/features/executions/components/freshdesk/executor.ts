@@ -99,17 +99,10 @@ export async function freshdeskExecutor({
   context,
   step,
   publish,
+  data,
 }: NodeExecutorParams): Promise<Record<string, unknown>> {
   // ─ Step 1: Load config ─
-  const config = await step.run(`freshdesk-load-config-${nodeId}`, async () => {
-    const node = await prisma.freshdeskNode.findUnique({
-      where: { nodeId },
-      include: { credential: true },
-    })
-    if (!node) throw new NonRetriableError("Freshdesk node config not found")
-    return node
-  })
-
+  const config = data as any;
   // ─ Step 2: Validate ─
   const { operation, variableName, continueOnFail } = config
   if (!config.credentialId || !config.credential) {

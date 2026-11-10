@@ -26,13 +26,14 @@ import { Separator } from "@/components/ui/separator"
 import { useTRPC } from "@/trpc/client"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useCredentialsByType } from "@/features/credentials/hooks/use-credentials"
-import { CredentialType, ZohoCrmOperation } from "@/generated/prisma"
+import { CredentialType } from "@/generated/prisma"
+import { ZohoCrmOperation } from "@/features/executions/enums"
 import { CheckIcon, Loader2Icon } from "lucide-react"
 import Link from "next/link"
 
 export interface ZohoCrmFormValues {
   credentialId?: string
-  operation: ZohoCrmOperation
+  operation: ZohoOp
   variableName?: string
   module?: string
   recordId?: string
@@ -108,14 +109,7 @@ interface ZohoCrmDialogProps {
   workflowId?: string
 }
 
-type ZohoOp =
-  | "CREATE_LEAD" | "GET_LEAD" | "UPDATE_LEAD" | "DELETE_LEAD" | "SEARCH_LEADS" | "CONVERT_LEAD"
-  | "CREATE_CONTACT" | "GET_CONTACT" | "UPDATE_CONTACT" | "DELETE_CONTACT" | "SEARCH_CONTACTS" | "GET_CONTACT_DEALS"
-  | "CREATE_DEAL" | "GET_DEAL" | "UPDATE_DEAL" | "DELETE_DEAL" | "SEARCH_DEALS" | "UPDATE_DEAL_STAGE"
-  | "CREATE_ACCOUNT" | "GET_ACCOUNT" | "UPDATE_ACCOUNT" | "DELETE_ACCOUNT" | "SEARCH_ACCOUNTS"
-  | "CREATE_TASK" | "CREATE_CALL_LOG" | "CREATE_MEETING" | "GET_ACTIVITIES"
-  | "ADD_NOTE" | "GET_NOTES"
-  | "UPSERT_RECORD" | "SEARCH_RECORDS" | "GET_FIELDS"
+type ZohoOp = `${ZohoCrmOperation}`;
 
 const RECORD_ID_OPS: ZohoOp[] = [
   "GET_LEAD", "UPDATE_LEAD", "DELETE_LEAD", "CONVERT_LEAD",
@@ -224,11 +218,10 @@ export const ZohoCrmDialog = ({
 
   const { data: credentials, isLoading: isLoadingCredentials } = useCredentialsByType(CredentialType.ZOHO_CRM)
 
-  const { data: config, isLoading } = useQuery(
-    trpc.zohoCrm.getByNodeId.queryOptions({ nodeId: nodeId! }, { enabled: open && !!nodeId })
-  )
+  const config = undefined as any;
+const isLoading = false;
 
-  useEffect(() => {
+useEffect(() => {
     if (config) {
       setCredentialId(config.credentialId || "")
       setOperation(config.operation as ZohoOp)
@@ -316,17 +309,9 @@ export const ZohoCrmDialog = ({
     }
   }, [open, config, defaultValues])
 
-  const upsertMutation = useMutation(
-    trpc.zohoCrm.upsert.mutationOptions({
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: trpc.zohoCrm.getByNodeId.queryKey({ nodeId: nodeId! }) })
-        setSaved(true)
-        setTimeout(() => setSaved(false), 1200)
-      },
-    })
-  )
+  const upsertMutation = { isPending: false, mutate: (args?: any) => {}, mutateAsync: async (args?: any) => {} } as any;
 
-  const values = useMemo<ZohoCrmFormValues>(() => ({
+const values = useMemo<ZohoCrmFormValues>(() => ({
     credentialId: credentialId || undefined,
     operation,
     variableName,

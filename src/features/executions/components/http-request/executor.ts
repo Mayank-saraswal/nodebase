@@ -102,7 +102,8 @@ export const httpRequestExecutor: NodeExecutor<HttpRequestData> = async ({
 
   try {
     const result = await step.run("http-request", async () => {
-      if (!data.endpoint) {
+      const endpointVal = data.endpoint || (data as any).url;
+      if (!endpointVal) {
         throw new NonRetriableError("HttpRequest node: No endpoint configured");
       }
 
@@ -119,7 +120,7 @@ export const httpRequestExecutor: NodeExecutor<HttpRequestData> = async ({
       const method = data.method;
 
       // Resolve endpoint URL with template variables
-      let endpoint = resolveTemplate(data.endpoint, context);
+      let endpoint = resolveTemplate(endpointVal, context);
 
       // Append query parameters
       if (data.queryParameters && data.queryParameters.length > 0) {

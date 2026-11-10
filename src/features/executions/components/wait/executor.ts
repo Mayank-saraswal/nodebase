@@ -25,8 +25,7 @@ function toSleepDuration(duration: number, unit: string): string {
   }
 }
 
-export const waitExecutor: NodeExecutor = async ({
-  nodeId,
+export const waitExecutor: NodeExecutor = async ({ data, nodeId,
   context,
   step,
   publish,
@@ -38,13 +37,9 @@ export const waitExecutor: NodeExecutor = async ({
     })
   )
 
-  const config = await step.run(`wait-${nodeId}-load-config`, async () => {
-    return prisma.waitNode.findUnique({
-      where: { nodeId },
-    })
-  })
+  const config = data as any;
 
-  if (!config) {
+if (!config) {
     await publish(
       waitChannel().status({
         nodeId,

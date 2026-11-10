@@ -777,3 +777,43 @@ enum GitHubOperation {
   ADVISORY_LIST_REPOS_AFFECTED
   ADVISORY_REPORT
 }
+
+// ─────────────────────────────────────────────────────────────
+// AI Agent Enums
+// Distinct from AIProvider (used for execution nodes)
+// ─────────────────────────────────────────────────────────────
+
+/// AI provider for the AI Agent workflow-generation feature
+enum AgentAIProvider {
+  OPENAI
+  CLAUDE
+  DIGITALOCEAN_GLM5
+}
+
+/// Status of a workflow generation attempt
+enum GenerationStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REJECTED
+}
+
+/// Role of a message in an AI agent conversation
+enum AgentMessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+/// Type of guardrail violation detected
+enum GuardrailViolationType {
+  PROMPT_INJECTION
+  OFF_TOPIC
+  EXCESSIVE_LENGTH
+  RATE_LIMITED
+  QUOTA_EXCEEDED
+  HARMFUL_CONTENT
+  PII_DETECTED
+}
+

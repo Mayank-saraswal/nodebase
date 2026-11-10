@@ -9,8 +9,8 @@ import prisma from "@/lib/db"
 export async function fetchAggregateRealtimeToken(nodeId: string) {
   try {
     const session = await requireAuth()
-    const node = await prisma.aggregateNode.findUnique({
-      where: { nodeId },
+    const node = await prisma.node.findUnique({
+      where: { id: nodeId },
       include: { workflow: { select: { userId: true } } },
     })
 

@@ -46,6 +46,8 @@ import { FilterNode } from "@/features/executions/components/filter/node";
 import { CashfreeNode } from "@/features/executions/components/cashfree/node";
 import { AggregateNode } from "@/features/executions/components/aggregate/node";
 import { PostgresNode } from "@/features/executions/components/postgres/node";
+import { GitHubNode } from "@/features/executions/components/github/node";
+import { GitHubTriggerNode } from "@/features/triggers/components/github-trigger/node";
 
 
 export const nodeComponents = {
@@ -96,6 +98,9 @@ export const nodeComponents = {
     [NodeType.CASHFREE_TRIGGER]: CashfreeNode,
     [NodeType.AGGREGATE]: AggregateNode,
     [NodeType.POSTGRES]: PostgresNode,
+    [NodeType.GITHUB]: GitHubNode,
+    [NodeType.GITHUB_TRIGGER]: GitHubTriggerNode,
+    
     //change later
 
 

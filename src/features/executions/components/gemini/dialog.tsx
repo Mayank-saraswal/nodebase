@@ -1,288 +1,319 @@
 "use client"
+
 import { Button } from "@/components/ui/button"
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog"
-import Image from "next/image"
-
 import {
-    Form,
-    FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage,
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectTrigger, SelectValue, SelectItem } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { useCredentialsByType } from "@/features/credentials/hooks/use-credentials"
 import { CredentialType } from "@/generated/prisma"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
+import { Separator } from "@/components/ui/separator"
 
-
-//  export const AVAILABLE_MODELS=[
-//     "gemini-2.0-flash", 
-//     "gemini-1.5-flash",
-//     "gemini-1.5-flash-8b",
-//     "gemini-1.0-pro",
-//     "gemini-1.0-pro",
-//     "gemini-pro"
-// ] as const
-
-
-
+const GEMINI_OPS = [
+  "CHAT",
+  "COUNT_TOKENS",
+  "EMBED",
+  "IMAGE",
+  "GENERATE_VIDEO",
+  "GET_VIDEO_OPERATION",
+  "WAIT_VIDEO",
+  "LIST_MODELS",
+] as const
 
 const formSchema = z.object({
-    variableName: z.string().min(1, { message: "Variable name is required" }).regex(/^[a-zA-Z_][a-zA-Z0-9_$]*$/, { message: "Variable name must start with a letter or underscore and can only contain letters, numbers, and underscores" }),
-    credentialId: z.string().min(1, { message: "Credential is required" }),
-    // model: z.string().min(1, { message: "Model is required" }),
-    systemPrompt: z.string().optional(),
-    userPrompt: z.string().min(1, { message: "User prompt is required" })
+  variableName: z
+    .string()
+    .min(1)
+    .regex(/^[a-zA-Z_][a-zA-Z0-9_$]*$/),
+  credentialId: z.string().optional(),
+  operation: z.string().min(1),
+  model: z.string().optional(),
+  systemPrompt: z.string().optional(),
+  userPrompt: z.string().optional(),
+  prompt: z.string().optional(),
+  operationName: z.string().optional(),
+  contentsJson: z.string().optional(),
+  paramsJson: z.string().optional(),
+  temperature: z.string().optional(),
+  maxOutputTokens: z.string().optional(),
 })
 
 export type GeminiFormValues = z.infer<typeof formSchema>
+
 interface Props {
-    open: boolean
-    onOpenChange: (open: boolean) => void
-    onSubmit: (values: z.infer<typeof formSchema>) => void
-    defaultValues?: Partial<GeminiFormValues>
-
-
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onSubmit: (values: GeminiFormValues) => void
+  defaultValues?: Partial<GeminiFormValues>
 }
 
 export const GeminiDialog = ({
-    open,
-    onOpenChange,
-    onSubmit,
-    defaultValues = {}
-
+  open,
+  onOpenChange,
+  onSubmit,
+  defaultValues = {},
 }: Props) => {
-    const { data: credentials, isLoading: isLoadingCredentials } = useCredentialsByType(CredentialType.GEMINI)
-    const form = useForm<z.infer<typeof formSchema>>({
-        resolver: zodResolver(formSchema),
-        defaultValues: {
-            variableName: defaultValues.variableName || "",
-            credentialId: defaultValues.credentialId || "",
-            // model: defaultValues.model|| AVAILABLE_MODELS[0],
-            userPrompt: defaultValues.userPrompt || "",
-            systemPrompt: defaultValues.systemPrompt || ""
-        }
+  const { data: credentials, isLoading } = useCredentialsByType(
+    CredentialType.GEMINI,
+  )
+
+  const form = useForm<GeminiFormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      variableName: defaultValues.variableName || "gemini",
+      credentialId: defaultValues.credentialId || "",
+      operation: defaultValues.operation || "CHAT",
+      model: defaultValues.model || "gemini-2.0-flash",
+      systemPrompt: defaultValues.systemPrompt || "",
+      userPrompt: defaultValues.userPrompt || "",
+      prompt: defaultValues.prompt || "",
+      operationName: defaultValues.operationName || "",
+      contentsJson: defaultValues.contentsJson || "",
+      paramsJson: defaultValues.paramsJson || "",
+      temperature: defaultValues.temperature || "",
+      maxOutputTokens: defaultValues.maxOutputTokens || "",
+    },
+  })
+
+  useEffect(() => {
+    if (!open) return
+    form.reset({
+      variableName: defaultValues.variableName || "gemini",
+      credentialId: defaultValues.credentialId || "",
+      operation: defaultValues.operation || "CHAT",
+      model: defaultValues.model || "gemini-2.0-flash",
+      systemPrompt: defaultValues.systemPrompt || "",
+      userPrompt: defaultValues.userPrompt || "",
+      prompt: defaultValues.prompt || "",
+      operationName: defaultValues.operationName || "",
+      contentsJson: defaultValues.contentsJson || "",
+      paramsJson: defaultValues.paramsJson || "",
+      temperature: defaultValues.temperature || "",
+      maxOutputTokens: defaultValues.maxOutputTokens || "",
     })
+  }, [open, defaultValues, form])
 
-    useEffect(() => {
-        if (open) {
-            form.reset({
-                variableName: defaultValues.variableName || "",
-                credentialId: defaultValues.credentialId || "",
-                // model: defaultValues.model|| AVAILABLE_MODELS[0],
-                userPrompt: defaultValues.userPrompt || "",
-                systemPrompt: defaultValues.systemPrompt || ""
-            })
-        }
-    }, [open, defaultValues, form])
+  const op = form.watch("operation") || "CHAT"
+  const varName = form.watch("variableName") || "gemini"
+  const needsText = ["CHAT", "COUNT_TOKENS", "EMBED"].includes(op)
+  const needsPrompt = ["IMAGE", "GENERATE_VIDEO"].includes(op)
+  const needsOpName = ["GET_VIDEO_OPERATION", "WAIT_VIDEO"].includes(op)
 
-    const watchVariableName = form.watch("variableName") || "myApiCall"
-
-    const handleSubmit = (values: z.infer<typeof formSchema>) => {
-        onSubmit(values)
-        onOpenChange(false);
-    }
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Gemini Configration </DialogTitle>
-                    <DialogDescription>
-                        Configure the Ai model and prompts for this node
-                    </DialogDescription>
-                </DialogHeader>
-                <Form {...form}>
-                    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8 mt-4">
-
-                        <FormField
-                            control={form.control}
-                            name="variableName"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>
-                                        Variable Name
-                                    </FormLabel>
-                                    <FormControl>
-                                        <Input
-                                            placeholder="myApiCall"
-                                            {...field}
-                                        />
-                                    </FormControl>
-
-                                    <FormDescription>
-                                        Use this name to reference the result in other nodes:{" "}
-                                        {`{{${watchVariableName}.text}}`}
-                                    </FormDescription>
-                                    <FormMessage />
-
-                                </FormItem>
-
-                            )}
-
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Gemini Configuration</DialogTitle>
+          <DialogDescription>
+            Full @corsair-dev/gemini surface (content, images, videos, models).
+            Dual-path: Corsair when enabled, else legacy AI credential path.
+          </DialogDescription>
+        </DialogHeader>
+        <Form {...form}>
+          <form
+            onSubmit={form.handleSubmit((v) => {
+              onSubmit(v)
+              onOpenChange(false)
+            })}
+            className="space-y-4"
+          >
+            <FormField
+              control={form.control}
+              name="variableName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Variable Name</FormLabel>
+                  <FormControl>
+                    <Input {...field} />
+                  </FormControl>
+                  <FormDescription>{`Output: {{${varName}}}`}</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="operation"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Operation</FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <FormControl>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {GEMINI_OPS.map((o) => (
+                        <SelectItem key={o} value={o}>
+                          {o.replace(/_/g, " ")}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="credentialId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Credential (legacy fallback)</FormLabel>
+                  <Select
+                    value={field.value || ""}
+                    onValueChange={field.onChange}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="w-full">
+                        <SelectValue
+                          placeholder={isLoading ? "Loading…" : "Select"}
                         />
-
-
-                        <FormField
-                            control={form.control}
-                            name="credentialId"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel> GEMINI Credential</FormLabel>
-
-                                    <Select
-                                        onValueChange={field.onChange}
-                                        defaultValue={field.value}
-                                        disabled={isLoadingCredentials || !credentials?.length}
-                                    >
-                                        <FormControl>
-                                            <SelectTrigger className="w-full">
-                                                <SelectValue placeholder="Select a Credential" />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            {credentials?.map((credential) => (
-                                                <SelectItem key={credential.id} value={credential.id}>
-                                                    <div className="flex items-center gap-2">
-                                                        <Image src="/logos/gemini.svg" alt="gemini" width={16} height={16} />
-                                                        <span>{credential.name}</span>
-                                                    </div>
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-
-
-
-                                    </Select>
-                                    <FormMessage />
-
-
-
-                                </FormItem>
-                            )}
-
-
-                        />
-
-                        {/* <FormField
-                            control={form.control}
-                            name="model"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>
-                                        Model
-                                    </FormLabel>
-                                   <Select
-                                   onValueChange={field.onChange}
-                                   defaultValue={field.value}
-                                   >
-                                    <FormControl>
-                                        <SelectTrigger className="w-full">
-                                            <SelectValue placeholder="select a model"/>
-
-                                            
-                                        </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                        {AVAILABLE_MODELS.map((model) => (
-                                            <SelectItem value={model} key={model}>
-                                                {model}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                   </Select>
-
-                                    <FormDescription>
-                                      The Google Gemini model to use for completion
-                                    </FormDescription>
-                                    <FormMessage />
-
-                                </FormItem>
-
-                            )}
-
-                        /> */}
-
-
-                        <FormField
-                            name="systemPrompt"
-                            control={form.control}
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>
-                                        SystemPrompt (optional)
-                                    </FormLabel>
-                                    <FormControl>
-                                        <Textarea
-                                            className="min-h-[80px] font-mono text-sm"
-                                            placeholder="you are a helpful assistant"
-                                            {...field}
-                                        />
-                                    </FormControl>
-
-                                    <FormDescription>
-                                        Sets the behavior of the assistant.Use {"{{variables}}"} for
-                                        simple values or {"{{json variable}}"} to
-                                        stringify object
-                                    </FormDescription>
-                                    <FormMessage />
-
-                                </FormItem>
-
-                            )}
-
-
-
-                        />
-
-
-                        <FormField
-                            name="userPrompt"
-                            control={form.control}
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>
-                                        UserPrompt
-                                    </FormLabel>
-                                    <FormControl>
-                                        <Textarea
-                                            className="min-h-[120px] font-mono text-sm"
-                                            placeholder="Summarize this text:{{json httpResponce.data}}"
-                                            {...field}
-                                        />
-                                    </FormControl>
-
-                                    <FormDescription>
-                                        The Prompt to send to the Ai.Use {"{{variables}}"} for
-                                        simple values or {"{{json variable}}"} to
-                                        stringify object
-                                    </FormDescription>
-                                    <FormMessage />
-
-                                </FormItem>
-
-                            )}
-
-
-
-                        />
-                        <DialogFooter className="mt-4">
-                            <Button type="submit">Save</Button>
-                        </DialogFooter>
-                    </form>
-                </Form>
-            </DialogContent>
-        </Dialog>
-    )
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {(credentials ?? []).map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="model"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Model</FormLabel>
+                  <FormControl>
+                    <Input placeholder="gemini-2.0-flash" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <Separator />
+            {op === "CHAT" && (
+              <FormField
+                control={form.control}
+                name="systemPrompt"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>System instruction</FormLabel>
+                    <FormControl>
+                      <Textarea className="min-h-16" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+            {needsText && (
+              <FormField
+                control={form.control}
+                name="userPrompt"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>User prompt / text</FormLabel>
+                    <FormControl>
+                      <Textarea className="min-h-24" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+            {needsPrompt && (
+              <FormField
+                control={form.control}
+                name="prompt"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Prompt</FormLabel>
+                    <FormControl>
+                      <Textarea className="min-h-20" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+            {needsOpName && (
+              <FormField
+                control={form.control}
+                name="operationName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Video operation name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="operations/…" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+            <FormField
+              control={form.control}
+              name="paramsJson"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Params JSON (optional)</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      className="font-mono text-xs min-h-16"
+                      placeholder="{}"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit">Save</Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  )
 }
-

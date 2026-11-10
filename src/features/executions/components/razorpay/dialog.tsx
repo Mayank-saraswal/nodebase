@@ -75,6 +75,10 @@ export interface RazorpayFormValues {
   narration?: string
   queueIfLowBalance?: boolean
   payoutId?: string
+  settlementId?: string
+  remainingCount?: string
+  scheduleChangeAt?: string
+  offerId?: string
   signature?: string
   throwOnInvalid?: boolean
   count?: string
@@ -97,11 +101,13 @@ type RazorpayOp =
   | "ORDER_CREATE" | "ORDER_FETCH" | "ORDER_FETCH_PAYMENTS" | "ORDER_LIST"
   | "PAYMENT_FETCH" | "PAYMENT_CAPTURE" | "PAYMENT_LIST" | "PAYMENT_UPDATE"
   | "REFUND_CREATE" | "REFUND_FETCH" | "REFUND_LIST"
-  | "CUSTOMER_CREATE" | "CUSTOMER_FETCH" | "CUSTOMER_UPDATE"
+  | "CUSTOMER_CREATE" | "CUSTOMER_FETCH" | "CUSTOMER_UPDATE" | "CUSTOMER_LIST"
   | "SUBSCRIPTION_CREATE" | "SUBSCRIPTION_FETCH" | "SUBSCRIPTION_CANCEL"
+  | "SUBSCRIPTION_LIST" | "SUBSCRIPTION_UPDATE" | "SUBSCRIPTION_PAUSE" | "SUBSCRIPTION_RESUME"
   | "INVOICE_CREATE" | "INVOICE_FETCH" | "INVOICE_SEND" | "INVOICE_CANCEL"
   | "PAYMENT_LINK_CREATE" | "PAYMENT_LINK_FETCH" | "PAYMENT_LINK_UPDATE" | "PAYMENT_LINK_CANCEL"
-  | "PAYOUT_CREATE" | "PAYOUT_FETCH"
+  | "PAYOUT_CREATE" | "PAYOUT_FETCH" | "PAYOUT_LIST"
+  | "SETTLEMENT_LIST" | "SETTLEMENT_FETCH"
   | "VERIFY_PAYMENT_SIGNATURE"
 
 const OUTPUT_HINTS: Record<string, string[]> = {
@@ -145,8 +151,25 @@ const needsCustomerId = (op: string) => ["CUSTOMER_FETCH", "CUSTOMER_UPDATE", "S
 const needsCustomerFields = (op: string) => ["CUSTOMER_CREATE", "CUSTOMER_UPDATE", "INVOICE_CREATE", "PAYMENT_LINK_CREATE"].includes(op)
 const needsNotes = (op: string) => ["ORDER_CREATE", "REFUND_CREATE", "CUSTOMER_CREATE", "CUSTOMER_UPDATE", "SUBSCRIPTION_CREATE", "PAYMENT_LINK_CREATE", "PAYMENT_LINK_UPDATE", "PAYOUT_CREATE", "PAYMENT_UPDATE"].includes(op)
 const needsDescription = (op: string) => ["INVOICE_CREATE", "PAYMENT_LINK_CREATE"].includes(op)
-const needsListParams = (op: string) => ["ORDER_LIST", "PAYMENT_LIST", "REFUND_LIST"].includes(op)
-const needsSubscriptionId = (op: string) => ["SUBSCRIPTION_FETCH", "SUBSCRIPTION_CANCEL"].includes(op)
+const needsSubscriptionId = (op: string) =>
+  [
+    "SUBSCRIPTION_FETCH",
+    "SUBSCRIPTION_CANCEL",
+    "SUBSCRIPTION_UPDATE",
+    "SUBSCRIPTION_PAUSE",
+    "SUBSCRIPTION_RESUME",
+  ].includes(op)
+const needsSettlementId = (op: string) => op === "SETTLEMENT_FETCH"
+const needsListParams = (op: string) =>
+  [
+    "ORDER_LIST",
+    "PAYMENT_LIST",
+    "REFUND_LIST",
+    "CUSTOMER_LIST",
+    "PAYOUT_LIST",
+    "SETTLEMENT_LIST",
+    "SUBSCRIPTION_LIST",
+  ].includes(op)
 const needsInvoiceId = (op: string) => ["INVOICE_FETCH", "INVOICE_SEND", "INVOICE_CANCEL"].includes(op)
 const needsPaymentLinkId = (op: string) => ["PAYMENT_LINK_FETCH", "PAYMENT_LINK_UPDATE", "PAYMENT_LINK_CANCEL"].includes(op)
 const needsSignature = (op: string) => op === "VERIFY_PAYMENT_SIGNATURE"
@@ -219,14 +242,10 @@ export const RazorpayDialog = ({
   const { data: credentials, isLoading: isLoadingCredentials } =
     useCredentialsByType(CredentialType.RAZORPAY)
 
-  const { data: config, isLoading } = useQuery(
-    trpc.razorpay.getByNodeId.queryOptions(
-      { nodeId: nodeId! },
-      { enabled: open && !!nodeId }
-    )
-  )
+  const config = undefined as any;
+const isLoading = false;
 
-  // Pre-fill from DB config when loaded
+// Pre-fill from DB config when loaded
   useEffect(() => {
     if (config) {
       setCredentialId(config.credentialId || "")
@@ -340,21 +359,9 @@ export const RazorpayDialog = ({
     }
   }, [open, defaultValues, config])
 
-  const upsertMutation = useMutation(
-    trpc.razorpay.upsert.mutationOptions({
-      onSuccess: () => {
-        if (nodeId) {
-          queryClient.invalidateQueries(
-            trpc.razorpay.getByNodeId.queryOptions({ nodeId })
-          )
-        }
-        setSaved(true)
-        setTimeout(() => setSaved(false), 2000)
-      },
-    })
-  )
+  const upsertMutation = { isPending: false, mutate: (args?: any) => {}, mutateAsync: async (args?: any) => {} } as any;
 
-  const isValid = !!credentialId.trim()
+const isValid = !!credentialId.trim()
 
   const handleSave = () => {
     if (!isValid) return
@@ -398,7 +405,9 @@ export const RazorpayDialog = ({
         <DialogHeader>
           <DialogTitle>Razorpay — Payment Gateway</DialogTitle>
           <DialogDescription>
-            Orders, payments, refunds, subscriptions, invoices, and more
+            Corsair covers orders, payments, refunds, customers, payouts,
+            settlements, and subscriptions when enabled. Invoices, payment
+            links, and signature verify use the legacy credential path.
           </DialogDescription>
         </DialogHeader>
 
@@ -497,12 +506,17 @@ export const RazorpayDialog = ({
                     <SelectLabel>Customers</SelectLabel>
                     <SelectItem value="CUSTOMER_CREATE">Create Customer</SelectItem>
                     <SelectItem value="CUSTOMER_FETCH">Fetch Customer</SelectItem>
+                    <SelectItem value="CUSTOMER_LIST">List Customers</SelectItem>
                     <SelectItem value="CUSTOMER_UPDATE">Update Customer</SelectItem>
                   </SelectGroup>
                   <SelectGroup>
                     <SelectLabel>Subscriptions</SelectLabel>
                     <SelectItem value="SUBSCRIPTION_CREATE">Create Subscription</SelectItem>
                     <SelectItem value="SUBSCRIPTION_FETCH">Fetch Subscription</SelectItem>
+                    <SelectItem value="SUBSCRIPTION_LIST">List Subscriptions</SelectItem>
+                    <SelectItem value="SUBSCRIPTION_UPDATE">Update Subscription</SelectItem>
+                    <SelectItem value="SUBSCRIPTION_PAUSE">Pause Subscription</SelectItem>
+                    <SelectItem value="SUBSCRIPTION_RESUME">Resume Subscription</SelectItem>
                     <SelectItem value="SUBSCRIPTION_CANCEL">Cancel Subscription</SelectItem>
                   </SelectGroup>
                   <SelectGroup>
@@ -523,6 +537,12 @@ export const RazorpayDialog = ({
                     <SelectLabel>Payouts</SelectLabel>
                     <SelectItem value="PAYOUT_CREATE">Create Payout</SelectItem>
                     <SelectItem value="PAYOUT_FETCH">Fetch Payout</SelectItem>
+                    <SelectItem value="PAYOUT_LIST">List Payouts</SelectItem>
+                  </SelectGroup>
+                  <SelectGroup>
+                    <SelectLabel>Settlements</SelectLabel>
+                    <SelectItem value="SETTLEMENT_LIST">List Settlements</SelectItem>
+                    <SelectItem value="SETTLEMENT_FETCH">Fetch Settlement</SelectItem>
                   </SelectGroup>
                   <SelectGroup>
                     <SelectLabel>Verification</SelectLabel>

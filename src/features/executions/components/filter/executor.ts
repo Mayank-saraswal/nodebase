@@ -6,22 +6,16 @@ import { filterChannel } from "@/inngest/channels/filter"
 import { filterArray, filterObjectKeys } from "./filter-engine"
 import type { ConditionGroup } from "./types"
 
-export const filterExecutor: NodeExecutor = async ({
-  nodeId,
+export const filterExecutor: NodeExecutor = async ({ data, nodeId,
   context,
   step,
   publish,
   userId,
 }) => {
   // ── Step 1: Load config ────────────────────────────────────────────────────
-  const config = await step.run(`filter-${nodeId}-load`, async () => {
-    return prisma.filterNode.findUnique({
-      where: { nodeId },
-      include: { workflow: { select: { userId: true } } },
-    })
-  })
+  const config = data as any;
 
-  await step.run(`filter-${nodeId}-validate`, async () => {
+await step.run(`filter-${nodeId}-validate`, async () => {
     if (!config) throw new NonRetriableError("Filter node not configured. Open settings to configure.")
     if (config.workflow.userId !== userId) throw new NonRetriableError("Unauthorized")
     return { valid: true }

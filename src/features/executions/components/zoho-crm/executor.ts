@@ -171,15 +171,10 @@ async function zohoApi(
   return data
 }
 
-export const zohoCrmExecutor: NodeExecutor = async ({ nodeId, context, step, publish }) => {
-  const config = await step.run(`zoho-crm-${nodeId}-load`, async () =>
-    prisma.zohoCrmNode.findUnique({
-      where: { nodeId },
-      include: { credential: true },
-    })
-  )
+export const zohoCrmExecutor: NodeExecutor = async ({ data, nodeId, context, step, publish }) => {
+  const config = data as any;
 
-  await step.run(`zoho-crm-${nodeId}-validate`, async () => {
+await step.run(`zoho-crm-${nodeId}-validate`, async () => {
     if (!config) {
       throw new NonRetriableError("Zoho CRM node not configured")
     }

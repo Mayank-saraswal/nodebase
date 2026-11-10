@@ -15,7 +15,7 @@ type GroqData = {
     systemPrompt?: string;
 };
 export const groqExecutor:NodeExecutor<GroqData > = async({
-    data,
+  data,
     nodeId,
     context,
     step,

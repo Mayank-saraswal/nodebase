@@ -1,0 +1,218 @@
+// ─────────────────────────────────────────────────────────────
+// Nodebase — Prisma Schema: AI Agent Models
+// AgentConversation, AgentMessage, AgentGeneration,
+// AgentUsage, AITemplate, AIGuardrailLog, AIPreference
+// ─────────────────────────────────────────────────────────────
+
+/// A conversation thread between a user and the Nodebase AI agent.
+/// Each conversation can produce one or more workflow generations.
+model AgentConversation {
+  id     String @id @default(cuid())
+  userId String
+
+  /// Optional human-readable title (auto-generated from first message)
+  title String?
+
+  /// Running count of messages for quick limit enforcement
+  messageCount    Int     @default(0)
+  /// Whether this conversation successfully produced a workflow
+  workflowCreated Boolean @default(false)
+  /// Link to a specific workflow (to enable 1 chat per workflow)
+  workflowId      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages    AgentMessage[]
+  generations AgentGeneration[]
+
+  @@index([userId, updatedAt(sort: Desc)])
+  @@map("agent_conversation")
+}
+
+/// Individual message in a conversation (user turn or AI response).
+model AgentMessage {
+  id             String           @id @default(cuid())
+  conversationId String
+  role           AgentMessageRole
+  content        String           @db.Text
+
+  /// Token usage for AI responses (null for user messages)
+  inputTokens  Int?
+  outputTokens Int?
+
+  /// Provider / model used for this response (null for user messages)
+  provider AgentAIProvider?
+  model    String?
+  /// End-to-end latency from request to first token
+  latencyMs Int?
+
+  createdAt DateTime @default(now())
+
+  conversation AgentConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt(sort: Asc)])
+  @@map("agent_message")
+}
+
+/// Record of a single workflow generation attempt.
+/// Linked to a conversation and optionally to a parent generation (refinement chain).
+model AgentGeneration {
+  id             String @id @default(cuid())
+  conversationId String
+  userId         String
+
+  /// The user's original prompt
+  prompt String @db.Text
+  /// If this is a refinement, points to the generation it was based on
+  refinedFromId String?
+
+  status              GenerationStatus @default(PENDING)
+  /// DB ID of the workflow created from this generation
+  generatedWorkflowId String?
+  errorMessage        String?          @db.Text
+
+  /// Provider / model used
+  provider  AgentAIProvider?
+  model     String?
+  /// Token usage
+  inputTokens  Int?
+  outputTokens Int?
+  /// Total generation latency
+  latencyMs Int?
+
+  /// Whether input guardrails passed
+  guardrailPassed Boolean @default(true)
+  guardrailReason String?
+
+  /// Stored as JSON snapshots for audit / replay
+  generatedNodes       Json?
+  generatedConnections Json?
+  credentialRequirements Json?
+
+  createdAt DateTime @default(now())
+
+  conversation AgentConversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  /// Self-referential chain: a refinement points to its parent
+  refinedFrom  AgentGeneration?   @relation("RefinementChain", fields: [refinedFromId], references: [id])
+  refinements  AgentGeneration[]  @relation("RefinementChain")
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status])
+  @@map("agent_generation")
+}
+
+/// Daily aggregated token usage per user.
+/// Used for quota enforcement and cost reporting.
+model AgentUsage {
+  id     String   @id @default(cuid())
+  userId String
+  /// Stored as DATE (no time component)
+  date   DateTime @db.Date
+
+  // Per-provider token counts
+  openaiInputTokens        Int @default(0)
+  openaiOutputTokens       Int @default(0)
+  claudeInputTokens        Int @default(0)
+  claudeOutputTokens       Int @default(0)
+  digitaloceanInputTokens  Int @default(0)
+  digitaloceanOutputTokens Int @default(0)
+
+  // Generation outcome counters
+  generationsRequested Int @default(0)
+  generationsCompleted Int @default(0)
+  generationsFailed    Int @default(0)
+  generationsRejected  Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId, date(sort: Desc)])
+  @@map("agent_usage")
+}
+
+/// Pre-built workflow template that users can apply as a starting point.
+model AITemplate {
+  id          String @id @default(cuid())
+  name        String @unique
+  description String @db.Text
+  /// Logical grouping: payment, communication, crm, analytics, etc.
+  category    String
+
+  /// Serialised node definitions (matches GeneratedWorkflow.nodes shape)
+  nodes       Json
+  connections Json
+  /// Credentials the template requires
+  requiredCredentials Json
+
+  tags            Json?
+  /// Whether this template is India-market-specific
+  isIndiaSpecific Boolean @default(false)
+  /// Times this template has been applied — used for sorting
+  popularity      Int     @default(0)
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category])
+  @@index([popularity(sort: Desc)])
+  @@map("ai_template")
+}
+
+/// Audit log of guardrail violations.
+/// Retained for 90 days for abuse detection.
+model AIGuardrailLog {
+  id             String                @id @default(cuid())
+  userId         String
+  conversationId String?
+
+  violationType GuardrailViolationType
+  /// low | medium | high | critical
+  severity      String
+  /// Truncated to 1000 chars to avoid bloat
+  input         String                 @db.Text
+  reason        String                 @db.Text
+
+  /// Which guard caught this: regex | heuristic | rate_limit | quota_check
+  detectedBy String
+  /// 0–1 confidence score from heuristic detectors
+  confidence Float?
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([violationType])
+  @@map("ai_guardrail_log")
+}
+
+/// Per-user AI agent preferences (preferred provider, feature flags, custom limits).
+model AIPreference {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  /// Which AI provider this user prefers — OpenAI is the system default
+  preferredProvider AgentAIProvider @default(OPENAI)
+
+  /// Custom per-user overrides; null means use system default
+  dailyGenerationLimit   Int?
+  monthlyGenerationLimit Int?
+
+  /// Feature flag toggles
+  enableMultiTurn Boolean @default(true)
+  enableTemplates Boolean @default(true)
+  enableDebug     Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("ai_preference")
+}

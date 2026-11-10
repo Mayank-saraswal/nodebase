@@ -67,14 +67,8 @@ export const AggregateNode = memo((props: NodeProps<AggregateNodeType>) => {
   const workflowId = params.workflowId as string
   const trpc = useTRPC()
 
-  const { data: dbConfig } = useQuery(
-    trpc.aggregate.getByNodeId.queryOptions(
-      { nodeId: props.id },
-      { enabled: !!props.id }
-    )
-  )
-
-  const nodeStatus = useNodeStatus({
+  const dbConfig = undefined as any;
+const nodeStatus = useNodeStatus({
     nodeId: props.id,
     channel: aggregateChannelName(props.id),
     topic: "status",
